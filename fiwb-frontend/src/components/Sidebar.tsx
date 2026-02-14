@@ -62,9 +62,9 @@ export default function Sidebar({ threads = [], activeThreadId, onThreadSelect, 
                 <div className="mb-8 px-2 relative z-10">
                     <button
                         onClick={onNewChat}
-                        className="w-full flex items-center gap-3 p-3.5 bg-blue-600 dark:bg-transparent glass hover:bg-blue-500 dark:hover:bg-white/10 text-white rounded-xl border border-blue-500/20 hover:border-blue-500/40 transition-all font-bold text-sm shadow-lg shadow-blue-500/5 group"
+                        className="w-full flex items-center gap-3 p-3.5 bg-blue-600 dark:bg-transparent glass hover:bg-blue-500 dark:hover:bg-white/10 text-gray-900 dark:text-white rounded-xl border border-blue-500/20 hover:border-blue-500/40 transition-all font-bold text-sm shadow-lg shadow-blue-500/5 group"
                     >
-                        <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform text-white">
                             <Plus size={16} />
                         </div>
                         Create a New Chat
