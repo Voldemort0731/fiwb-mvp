@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, MessageSquareText, Settings, LogOut, ChevronRight, Plus, MessageCircle, Trash2, TrendingUp, Mail } from "lucide-react";
+import { LayoutDashboard, MessageSquareText, Settings, LogOut, ChevronRight, Plus, MessageCircle, Trash2, TrendingUp, Mail, Cloud } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import GmailSyncModal from "@/components/GmailSyncModal";
+import DriveSyncModal from "@/components/DriveSyncModal";
 import clsx from "clsx";
 
 interface SidebarProps {
@@ -20,6 +21,7 @@ export default function Sidebar({ threads = [], activeThreadId, onThreadSelect, 
     const pathname = usePathname();
     const [email, setEmail] = useState<string | null>(null);
     const [isGmailModalOpen, setIsGmailModalOpen] = useState(false);
+    const [isDriveModalOpen, setIsDriveModalOpen] = useState(false);
 
     useEffect(() => {
         if (typeof window !== "undefined") {
@@ -102,17 +104,24 @@ export default function Sidebar({ threads = [], activeThreadId, onThreadSelect, 
                             );
                         })}
 
-                        {!isChatPage && (
-                            <button
-                                onClick={() => setIsGmailModalOpen(true)}
-                                className="w-full group flex items-center justify-between p-3 rounded-xl transition-all duration-300 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-gray-200 border border-transparent text-gray-400 dark:text-gray-600"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <Mail size={18} className="text-gray-400 dark:text-gray-500 group-hover:text-red-400 transition-colors" />
-                                    <span className="font-semibold text-sm tracking-tight">Sync Gmail</span>
-                                </div>
-                            </button>
-                        )}
+                        <button
+                            onClick={() => setIsGmailModalOpen(true)}
+                            className="w-full group flex items-center justify-between p-3 rounded-xl transition-all duration-300 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-gray-200 border border-transparent text-gray-400 dark:text-gray-600"
+                        >
+                            <div className="flex items-center gap-3">
+                                <Mail size={18} className="text-gray-400 dark:text-gray-500 group-hover:text-red-400 transition-colors" />
+                                <span className="font-semibold text-sm tracking-tight">Sync Gmail</span>
+                            </div>
+                        </button>
+                        <button
+                            onClick={() => setIsDriveModalOpen(true)}
+                            className="w-full group flex items-center justify-between p-3 rounded-xl transition-all duration-300 hover:bg-gray-100 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-gray-200 border border-transparent text-gray-400 dark:text-gray-600"
+                        >
+                            <div className="flex items-center gap-3">
+                                <Cloud size={18} className="text-gray-400 dark:text-gray-500 group-hover:text-sky-400 transition-colors" />
+                                <span className="font-semibold text-sm tracking-tight">Sync Drive</span>
+                            </div>
+                        </button>
                     </div>
                 </section>
 
@@ -175,6 +184,7 @@ export default function Sidebar({ threads = [], activeThreadId, onThreadSelect, 
             </div>
 
             <GmailSyncModal isOpen={isGmailModalOpen} onClose={() => setIsGmailModalOpen(false)} />
+            <DriveSyncModal isOpen={isDriveModalOpen} onClose={() => setIsDriveModalOpen(false)} />
         </div>
     );
 }

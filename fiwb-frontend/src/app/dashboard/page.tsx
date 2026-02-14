@@ -299,6 +299,13 @@ export default function Dashboard() {
                                     Sync Gmail
                                 </button>
                                 <button
+                                    onClick={() => setIsDriveModalOpen(true)}
+                                    className="px-5 py-2.5 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-600/10 hover:border-blue-500/30 transition-all active:scale-95"
+                                >
+                                    <Cloud size={16} className="text-sky-500" />
+                                    Sync Drive
+                                </button>
+                                <button
                                     onClick={handleSync}
                                     disabled={syncing}
                                     className="px-5 py-2.5 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-600/10 hover:border-blue-500/30 transition-all active:scale-95 disabled:opacity-50"
