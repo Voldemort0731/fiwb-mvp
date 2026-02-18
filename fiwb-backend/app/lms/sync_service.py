@@ -102,15 +102,26 @@ class LMSSyncService:
                 db_course.last_synced = datetime.utcnow()
 
             # PHASE 3: Cleanup (Un-enrolled courses)
-            # This happens before we start Phase 2 so we don't hold the DB open
-            try:
-                for user_course in list(user.courses):
-                    if user_course.platform == "Google Classroom" and user_course.id not in active_course_ids:
-                        logger.info(f"🗑️ Removing un-enrolled course {user_course.name}")
-                        user.courses.remove(user_course)
-                db.commit()
-            except Exception as cleanup_err:
-                logger.error(f"Cleanup failed: {cleanup_err}")
+            # SAFETY CHECK: Only prune if we fetched courses successfully.
+            # If courses_data is empty but user had many courses, it might be a transient API failure.
+            existing_classroom_courses = [c for c in user.courses if c.platform == "Google Classroom"]
+            
+            if len(courses_data) == 0 and len(existing_classroom_courses) > 0:
+                logger.warning(f"⚠️ API returned 0 courses for {self.user_email} (previously had {len(existing_classroom_courses)}). Skipping cleanup to prevent accidental data loss.")
+            else:
+                try:
+                    removed_count = 0
+                    for user_course in list(user.courses):
+                        if user_course.platform == "Google Classroom" and user_course.id not in active_course_ids:
+                            logger.info(f"🗑️ Removing un-enrolled course {user_course.name} ({user_course.id}) for {self.user_email}")
+                            user.courses.remove(user_course)
+                            removed_count += 1
+                    
+                    if removed_count > 0:
+                        db.commit()
+                        logger.info(f"✅ Cleanup complete: Removed {removed_count} courses.")
+                except Exception as cleanup_err:
+                    logger.error(f"Cleanup failed for {self.user_email}: {cleanup_err}")
 
             # Commit Phase 1 results
             db.commit()

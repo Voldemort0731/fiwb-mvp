@@ -54,52 +54,40 @@ class GoogleClassroomClient:
     async def get_courses(self):
         """Fetch all courses the user is enrolled in or teaching in parallel."""
         from app.utils.google_lock import GoogleApiLock
-        try:
-            service = await self._get_service()
-            
-            async def fetch_student_courses():
-                try:
-                    async with GoogleApiLock.get_lock():
-                        results = await asyncio.to_thread(
-                            lambda: service.courses().list(
-                                studentId='me',
-                                courseStates=['ACTIVE']
-                            ).execute()
-                        )
-                    return results.get('courses', [])
-                except Exception as e:
-                    logger.error(f"Error fetching student courses: {e}")
-                    return []
+        service = await self._get_service()
+        
+        async def fetch_student_courses():
+            async with GoogleApiLock.get_lock():
+                results = await asyncio.to_thread(
+                    lambda: service.courses().list(
+                        studentId='me',
+                        courseStates=['ACTIVE']
+                    ).execute()
+                )
+            return results.get('courses', [])
 
-            async def fetch_teacher_courses():
-                try:
-                    async with GoogleApiLock.get_lock():
-                        results = await asyncio.to_thread(
-                            lambda: service.courses().list(
-                                teacherId='me',
-                                courseStates=['ACTIVE']
-                            ).execute()
-                        )
-                    return results.get('courses', [])
-                except Exception as e:
-                    logger.error(f"Error fetching teacher courses: {e}")
-                    return []
+        async def fetch_teacher_courses():
+            async with GoogleApiLock.get_lock():
+                results = await asyncio.to_thread(
+                    lambda: service.courses().list(
+                        teacherId='me',
+                        courseStates=['ACTIVE']
+                    ).execute()
+                )
+            return results.get('courses', [])
 
-            # 🚀 Parallel Execution
-            res_student, res_teacher = await asyncio.gather(
-                fetch_student_courses(),
-                fetch_teacher_courses()
-            )
-            
-            all_courses = res_student + res_teacher
-            
-            # Deduplicate by ID
-            unique_courses = {c['id']: c for c in all_courses}.values()
-            return list(unique_courses)
-
-        except Exception as e:
-            logger.error(f"General Classroom API Error: {e}")
-            return []
+        # 🚀 Parallel Execution
+        # Let exceptions bubble up to the sync service for proper handling
+        res_student, res_teacher = await asyncio.gather(
+            fetch_student_courses(),
+            fetch_teacher_courses()
+        )
+        
+        all_courses = res_student + res_teacher
+        
+        # Deduplicate by ID
+        unique_courses = {c['id']: c for c in all_courses}.values()
+        return list(unique_courses)
 
     async def get_coursework(self, course_id: str):
         """Fetch assignments for a course."""
