@@ -49,7 +49,16 @@ async def on_startup():
 
 @app.get("/")
 async def root():
-    return {"message": "FIWB AI Backend is running"}
+    return {
+        "message": "FIWB AI Backend is running",
+        "env_check": {
+            "google_id": bool(settings.GOOGLE_CLIENT_ID),
+            "google_secret": bool(settings.GOOGLE_CLIENT_SECRET),
+            "openai_key": bool(settings.OPENAI_API_KEY),
+            "database_set": bool(os.getenv("DATABASE_URL")),
+            "supermemory_key": bool(settings.SUPERMEMORY_API_KEY)
+        }
+    }
 
 @app.get("/health")
 async def health_check():

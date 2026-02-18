@@ -42,10 +42,11 @@ export default function Home() {
         router.push("/dashboard");
       } catch (err) {
         console.error("Login error:", err);
-        setError(`Failed to login: ${(err as Error).message}`);
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        setError(`Failed to initialize: ${errorMessage}. Check if NEXT_PUBLIC_API_URL is set correctly in Vercel.`);
         setLoading(false);
       } finally {
-        // No-op - redirecting
+        // No-op
       }
     },
     onError: (error) => {
