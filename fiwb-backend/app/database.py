@@ -31,8 +31,8 @@ else:
         
     engine = create_engine(
         SQLALCHEMY_DATABASE_URL,
-        pool_size=20,
-        max_overflow=10,
+        pool_size=5,  # Reduced for Railway/Hobby DB limits
+        max_overflow=2,
         pool_timeout=30,
         pool_recycle=1800,
         pool_pre_ping=True

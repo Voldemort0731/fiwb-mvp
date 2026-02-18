@@ -39,11 +39,14 @@ from app.intelligence.scheduler import start_scheduler
 @app.on_event("startup")
 async def on_startup():
     try:
+        import asyncio
         from app.database import engine
         from app.models import Base
-        Base.metadata.create_all(bind=engine)
+        # Offload sync DB creation to a thread to avoid blocking the whole app startup
+        await asyncio.to_thread(Base.metadata.create_all, bind=engine)
+        print("✅ Database ready")
     except Exception as e:
-        print(f"Database initialization error: {e}")
+        print(f"❌ Database initialization error: {e}")
     # start_scheduler()  # Manually disabled to end background tasks
     pass
 
