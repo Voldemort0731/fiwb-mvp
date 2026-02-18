@@ -87,12 +87,14 @@ class GmailSyncService:
 
         messages = results.get('messages', [])
         
-        # 1. Identify only NEW messages (stop at first existing)
-        new_messages = []
-        for msg in messages:
-            if db.query(Material).filter(Material.id == msg['id']).first():
-                break
-            new_messages.append(msg)
+        # 1. Identify only NEW messages
+        # Bulk query existing message IDs to avoid N+1 queries
+        existing_ids = {m[0] for m in db.query(Material.id).filter(
+            Material.course_id == "GMAIL_INBOX",
+            Material.id.in_([m['id'] for m in messages])
+        ).all()}
+        
+        new_messages = [m for m in messages if m['id'] not in existing_ids]
             
         if not new_messages:
             logger.info(f"No new emails for {self.user_email}")
@@ -185,31 +187,11 @@ class GmailSyncService:
             await asyncio.gather(*(process_with_semaphore(m) for m in batch))
             await asyncio.sleep(0.1)
         
-        # Cleanup: Keep only top 25 recent emails locally AND in Supermemory
-        try:
-            from sqlalchemy import or_
-            all_emails = db.query(Material).filter(
-                Material.course_id == "GMAIL_INBOX",
-                or_(Material.user_id == user.id, Material.user_id == None)
-            ).order_by(Material.created_at.desc()).all()
+        # Update user last_synced
+        if user:
+            user.last_synced = datetime.datetime.utcnow()
+            db.commit()
             
-            if len(all_emails) > 25:
-                for old_email in all_emails[25:]:
-                    # Purge from Supermemory
-                    sm_res = await self.sm_client.search(
-                        query=" ", 
-                        filters={"AND": [{"key": "gmail_id", "value": old_email.id}]}
-                    )
-                    for doc in sm_res.get('results', []):
-                        await self.sm_client.delete_document(doc.get('documentId') or doc.get('id'))
-                    
-                    db.delete(old_email)
-                    
-                db.commit()
-                logger.info(f"Pruned extra emails. Local & Supermemory now restricted to most recent 25.")
-        except Exception as e:
-            logger.error(f"Gmail detailed cleanup failed: {e}")
-        
         db.close()
         return stats["synced_count"]
 
