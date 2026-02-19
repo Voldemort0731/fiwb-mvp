@@ -23,7 +23,7 @@ interface Source {
 interface MessageContentProps {
     content: string;
     sources?: Source[];
-    onOpenDocument?: (url: string | null, title: string, content?: string) => void;
+    onOpenDocument?: (url: string, title: string) => void;
 }
 
 function MessageContent({ content, sources = [], onOpenDocument }: MessageContentProps) {
@@ -70,7 +70,7 @@ function MessageContent({ content, sources = [], onOpenDocument }: MessageConten
         ...docCitations.map(d => d.baseTitle),
         ...legacySources,
         ...retrievedTitles
-    ])).filter(s => s && s.trim().length > 0 && s.toLowerCase() !== "none");
+    ])).filter(s => s && s.toLowerCase() !== "none");
 
     // Normalize LaTeX delimiters for better rendering
     let finalDisplayContent = markdownContent
@@ -186,9 +186,9 @@ function MessageContent({ content, sources = [], onOpenDocument }: MessageConten
 
                                         {link ? (
                                             <button
-                                                onClick={(e: React.MouseEvent) => {
+                                                onClick={(e) => {
                                                     e.preventDefault();
-                                                    if (onOpenDocument) onOpenDocument(link || null, displayTitle, snippet);
+                                                    if (onOpenDocument) onOpenDocument(link, displayTitle);
                                                 }}
                                                 className="block group/title text-left w-full"
                                             >
@@ -207,7 +207,7 @@ function MessageContent({ content, sources = [], onOpenDocument }: MessageConten
                                             {link ? (
                                                 <div className="flex items-center gap-2">
                                                     <button
-                                                        onClick={() => onOpenDocument?.(link || null, displayTitle, snippet)}
+                                                        onClick={() => onOpenDocument?.(link, displayTitle)}
                                                         className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-lg shadow-blue-600/20 active:scale-95"
                                                     >
                                                         <Zap size={10} />
@@ -383,7 +383,6 @@ function ChatBody() {
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [activeDocumentUrl, setActiveDocumentUrl] = useState<string | null>(null);
     const [activeDocumentTitle, setActiveDocumentTitle] = useState<string | null>(null);
-    const [activeDocumentContent, setActiveDocumentContent] = useState<string | null>(null);
 
     // Track if user has scrolled up
     const handleScroll = (e: any) => {
@@ -658,7 +657,7 @@ function ChatBody() {
                 threads={threads}
                 activeThreadId={activeThreadId}
                 onThreadSelect={handleThreadSelect}
-                onNewChat={() => { setActiveThreadId("new"); setMessages([]); setActiveDocumentUrl(null); setActiveDocumentContent(null); }}
+                onNewChat={() => { setActiveThreadId("new"); setMessages([]); setActiveDocumentUrl(null); }}
                 onDeleteThread={handleDeleteThread}
             />
             <div className="flex-1 flex overflow-hidden">
@@ -773,10 +772,9 @@ function ChatBody() {
                                                 <MessageContent
                                                     content={msg.content}
                                                     sources={msg.sources}
-                                                    onOpenDocument={(url, title, content) => {
+                                                    onOpenDocument={(url, title) => {
                                                         setActiveDocumentUrl(url);
                                                         setActiveDocumentTitle(title);
-                                                        setActiveDocumentContent(content || null);
                                                     }}
                                                 />
                                             )}
@@ -976,7 +974,7 @@ function ChatBody() {
                                     </div>
                                     <div className="flex flex-col">
                                         <span className="text-[9px] font-black uppercase tracking-widest text-blue-500/70">Document Workspace</span>
-                                        <h3 className="text-sm font-black truncate max-w-[200px] sm:max-w-[400px]">{activeDocumentTitle || "Neural Memory"}</h3>
+                                        <h3 className="text-sm font-black truncate max-w-[200px] sm:max-w-[400px]">{activeDocumentTitle}</h3>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -998,54 +996,12 @@ function ChatBody() {
                                     </button>
                                 </div>
                             </div>
-                            <div className="flex-1 w-full relative bg-white dark:bg-black/20 overflow-hidden">
-                                {activeDocumentUrl ? (
-                                    (() => {
-                                        let embedUrl = activeDocumentUrl;
-                                        if (embedUrl?.includes('drive.google.com') && !embedUrl.includes('preview')) {
-                                            embedUrl = embedUrl.replace('/view', '/preview');
-                                        }
-                                        return (
-                                            <iframe
-                                                src={embedUrl}
-                                                className="w-full h-full border-none"
-                                                title="Institutional Document Viewer"
-                                            />
-                                        );
-                                    })()
-                                ) : activeDocumentContent ? (
-                                    <div className="h-full overflow-y-auto p-12 scrollbar-premium bg-white dark:bg-[#0a0a0a]">
-                                        <div className="max-w-3xl mx-auto space-y-8">
-                                            <div className="flex items-center gap-3 pb-6 border-b border-gray-100 dark:border-white/5">
-                                                <div className="p-3 rounded-2xl bg-blue-500/10 text-blue-500 border border-blue-500/20">
-                                                    <Bot size={24} />
-                                                </div>
-                                                <div>
-                                                    <h2 className="text-2xl font-black tracking-tight">{activeDocumentTitle}</h2>
-                                                    <p className="text-[10px] font-black uppercase tracking-widest text-blue-500">Verified Academic Intelligence Content</p>
-                                                </div>
-                                            </div>
-                                            <div className="markdown-content prose dark:prose-invert prose-blue max-w-none text-gray-800 dark:text-gray-200 leading-relaxed font-medium">
-                                                <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
-                                                    {activeDocumentContent}
-                                                </ReactMarkdown>
-                                            </div>
-                                            <div className="pt-20 pb-10 text-center">
-                                                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-gray-400">End of Verified Context</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="h-full flex flex-col items-center justify-center p-12 text-center space-y-4">
-                                        <div className="p-6 rounded-full bg-gray-50 dark:bg-white/5 text-gray-300">
-                                            <Layers size={48} />
-                                        </div>
-                                        <div className="max-w-xs space-y-2">
-                                            <h4 className="text-lg font-black tracking-tight">Resource Unloaded</h4>
-                                            <p className="text-xs text-gray-500 font-medium">This document reference does not contain direct viewable content or the link has expired.</p>
-                                        </div>
-                                    </div>
-                                )}
+                            <div className="flex-1 w-full relative bg-white overflow-hidden">
+                                <iframe
+                                    src={activeDocumentUrl}
+                                    className="w-full h-full border-none"
+                                    title="Institutional Document Viewer"
+                                />
                                 {/* Glass Overlay for smoothness */}
                                 <div className="absolute inset-0 pointer-events-none border border-black/5 dark:border-white/5 rounded-none" />
                             </div>

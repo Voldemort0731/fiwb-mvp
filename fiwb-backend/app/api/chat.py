@@ -187,7 +187,7 @@ async def chat_stream(
                     
                     # Unified Title Logic (Matched with PromptArchitect)
                     course_name = meta.get('course_name') or meta.get('course_id') or ""
-                    base_title = meta.get('title') or meta.get('file_name') or "Academic Insight"
+                    base_title = meta.get('title') or meta.get('file_name') or "Institutional Document"
                     full_title = f"{base_title} [{course_name}]" if course_name else base_title
                     
                     if full_title not in sources_dict:
