@@ -139,74 +139,62 @@ function MessageContent({ content, sources = [] }: { content: string; sources?: 
                             </div>
                         </div>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                         {allBaseSources.map((baseTitle, idx) => {
                             const matchedSource = sources.find(s => s.title.toLowerCase() === baseTitle.toLowerCase());
                             const citation = docCitations.find(d => d.baseTitle.toLowerCase() === baseTitle.toLowerCase());
                             const displayTitle = matchedSource?.display || baseTitle;
                             const link = matchedSource?.link;
                             const pages = citation?.pages;
-                            const snippet = matchedSource?.snippet;
 
                             return (
                                 <motion.div
                                     key={idx}
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: idx * 0.05 }}
-                                    whileHover={{ y: -4, scale: 1.01 }}
-                                    className="group/source relative h-full"
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ delay: idx * 0.03 }}
+                                    whileHover={{ y: -2 }}
+                                    className="group/source h-full"
                                 >
-                                    <div className="h-full flex flex-col p-4 rounded-[24px] glass-dark border border-gray-200/50 dark:border-white/5 bg-white/70 dark:bg-black/60 hover:border-blue-500/40 hover:bg-blue-500/[0.02] transition-all duration-300 shadow-xl shadow-black/5">
-                                        <div className="flex items-start justify-between mb-3">
-                                            <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg shadow-blue-500/20">
-                                                <FileText size={18} className="text-white" />
+                                    <div className="h-full flex flex-col p-3 rounded-2xl glass-dark border border-gray-200/50 dark:border-white/5 bg-white/70 dark:bg-black/60 hover:border-blue-500/40 hover:bg-blue-500/[0.02] transition-all duration-300 shadow-lg shadow-black/5">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <div className="p-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                                                <FileText size={14} className="text-blue-500" />
                                             </div>
-                                            {pages ? (
-                                                <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-                                                    <BookOpen size={10} className="text-blue-500" />
-                                                    <span className="text-[10px] font-extrabold text-blue-500 uppercase">Pages {pages}</span>
-                                                </div>
-                                            ) : (
-                                                <div className="flex items-center gap-1 px-2 py-0.5 bg-gray-100 dark:bg-white/5 rounded-md">
-                                                    <span className="text-[8px] font-bold text-gray-400 uppercase">Document</span>
-                                                </div>
+                                            {pages && (
+                                                <span className="text-[9px] font-black text-blue-500/80 bg-blue-500/5 px-1.5 py-0.5 rounded border border-blue-500/10 uppercase">Pg {pages}</span>
                                             )}
                                         </div>
 
                                         {link ? (
                                             <a href={link} target="_blank" rel="noopener noreferrer" className="block group/title">
-                                                <h4 className="text-[12px] font-black text-gray-900 dark:text-gray-100 line-clamp-2 mb-3 leading-tight group-hover/title:text-blue-600 dark:group-hover/title:text-blue-400 transition-colors">
+                                                <h4 className="text-[11px] font-bold text-gray-900 dark:text-gray-100 line-clamp-2 mb-2 leading-tight group-hover/title:text-blue-600 dark:group-hover/title:text-blue-400 transition-colors">
                                                     {displayTitle}
                                                 </h4>
                                             </a>
                                         ) : (
-                                            <h4 className="text-[12px] font-black text-gray-900 dark:text-gray-100 line-clamp-2 mb-3 leading-tight transition-colors">
+                                            <h4 className="text-[11px] font-bold text-gray-900 dark:text-gray-100 line-clamp-2 mb-2 leading-tight">
                                                 {displayTitle}
                                             </h4>
                                         )}
 
-
-                                        <div className="mt-auto pt-3 border-t border-gray-100 dark:border-white/5 flex items-center justify-between">
+                                        <div className="mt-auto pt-2 border-t border-gray-100 dark:border-white/5 flex items-center justify-between">
                                             {link ? (
                                                 <a
                                                     href={link}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-lg shadow-blue-600/20 active:scale-95"
+                                                    className="flex items-center gap-1.5 text-[9px] font-black text-blue-500 uppercase tracking-wider hover:text-blue-600 transition-colors"
                                                 >
                                                     <BookOpen size={10} />
                                                     View Original
                                                 </a>
                                             ) : (
-                                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-white/5 text-gray-500 rounded-xl text-[10px] font-black uppercase tracking-wider opacity-60">
-                                                    <Settings size={10} />
-                                                    Legacy Asset
-                                                </div>
+                                                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Legacy Asset</span>
                                             )}
-                                            <div className="flex items-center -space-x-1">
-                                                <div className="w-5 h-5 rounded-full border-2 border-white dark:border-gray-900 bg-blue-500 flex items-center justify-center">
-                                                    <Check size={8} className="text-white" />
+                                            <div className="flex items-center gap-1">
+                                                <div className="w-4 h-4 rounded-full bg-blue-500/10 flex items-center justify-center">
+                                                    <Check size={8} className="text-blue-500" />
                                                 </div>
                                             </div>
                                         </div>
