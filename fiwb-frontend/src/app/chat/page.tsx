@@ -598,15 +598,9 @@ function ChatBody() {
                         </div>
                         <div>
                             <h2 className="text-lg font-black tracking-tight flex items-center gap-2">
-                                Neural <span className="text-blue-600 dark:text-blue-500">Workspace</span>
+                                {threads.find(t => t.id === activeThreadId)?.title || (activeThreadId === 'new' ? 'Neural Workspace' : 'Loading Chat...')}
                             </h2>
                             <p className="text-[9px] font-black uppercase tracking-widest text-gray-700 dark:text-gray-500">Session: {activeThreadId === 'new' ? 'Uninitialized' : activeThreadId.slice(0, 8)}</p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <div className="px-3 py-1.5 glass rounded-full border border-blue-500/10 flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)] animate-pulse" />
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Global Synapse Active</span>
                         </div>
                     </div>
                 </header>
