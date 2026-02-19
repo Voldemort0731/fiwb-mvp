@@ -190,31 +190,6 @@ function MessageContent({ content, sources = [] }: { content: string; sources?: 
                                             </h4>
                                         )}
 
-                                        {snippet && !link && !['enhanced_memory', 'assistant_knowledge', 'user_profile'].includes(matchedSource?.source_type || '') && (
-                                            <div className="mb-4">
-                                                <button
-                                                    onClick={() => setExpandedSnippet(expandedSnippet === idx ? null : idx)}
-                                                    className="flex items-center gap-2 text-[10px] font-black text-blue-500/70 hover:text-blue-500 uppercase tracking-widest transition-colors"
-                                                >
-                                                    {expandedSnippet === idx ? <X size={10} /> : <Zap size={10} />}
-                                                    {expandedSnippet === idx ? "Close Excerpt" : "Read Referenced Part"}
-                                                </button>
-                                                <AnimatePresence>
-                                                    {expandedSnippet === idx && (
-                                                        <motion.div
-                                                            initial={{ height: 0, opacity: 0 }}
-                                                            animate={{ height: "auto", opacity: 1 }}
-                                                            exit={{ height: 0, opacity: 0 }}
-                                                            className="overflow-hidden"
-                                                        >
-                                                            <div className="mt-2 p-3 rounded-xl bg-blue-500/5 border border-blue-500/10 text-[11px] text-gray-700 dark:text-gray-300 font-medium leading-relaxed italic border-l-2 border-l-blue-500/50 text-wrap break-words whitespace-pre-wrap">
-                                                                "...{snippet}..."
-                                                            </div>
-                                                        </motion.div>
-                                                    )}
-                                                </AnimatePresence>
-                                            </div>
-                                        )}
 
                                         <div className="mt-auto pt-3 border-t border-gray-100 dark:border-white/5 flex items-center justify-between">
                                             {link ? (
