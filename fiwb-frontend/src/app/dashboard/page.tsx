@@ -244,18 +244,18 @@ export default function Dashboard() {
                                     onKeyDown={(e) => {
                                         if (e.key === "Enter") {
                                             e.preventDefault();
-                                            if (searchResults.length > 0) {
-                                                const topResult = searchResults[0];
-                                                if (topResult.action) topResult.action();
-                                                else if (topResult.id) router.push(`/course/${topResult.id}`);
-                                                setIsSearchFocused(false);
-                                                setSearchQuery("");
+                                            // Explicitly check for direct results first to satisfy user requirement
+                                            const directResult = searchResults.find(r => r.type !== 'ai');
+
+                                            if (directResult) {
+                                                if (directResult.action) directResult.action();
+                                                else if (directResult.id) router.push(`/course/${directResult.id}`);
                                             } else if (searchQuery.trim()) {
-                                                // Fallback to Ask AI if no recommendations yet
+                                                // If no direct results found, fall back to AI Search
                                                 router.push(`/chat?q=${encodeURIComponent(searchQuery)}`);
-                                                setIsSearchFocused(false);
-                                                setSearchQuery("");
                                             }
+                                            setIsSearchFocused(false);
+                                            setSearchQuery("");
                                         }
                                     }}
                                     placeholder="Search Drive, Gmail, Classroom..."
