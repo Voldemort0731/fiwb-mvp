@@ -108,6 +108,19 @@ export default function Dashboard() {
             }
         });
 
+        // 5. Initial Fallback (Synchronous)
+        if (results.length === 0) {
+            results.push({
+                type: 'ai',
+                title: `Ask AI: "${searchQuery}"`,
+                subtitle: 'Press Enter to ask',
+                icon: Sparkles,
+                action: () => router.push(`/chat?q=${encodeURIComponent(searchQuery)}`)
+            });
+        }
+
+        setSearchResults(results);
+
         // 4. Search Course Materials via API (debounced)
         const searchMaterials = async () => {
             const email = localStorage.getItem("user_email");
@@ -117,49 +130,50 @@ export default function Dashboard() {
                 const res = await fetch(`${API_URL}/api/search/materials?q=${encodeURIComponent(query)}&user_email=${email}`);
                 const materials = await res.json();
 
-                materials.forEach((m: any) => {
-                    // Deduplicate results (e.g. if already found locally)
-                    if (results.some(r => r.id === m.id)) return;
+                // Remove the temporary "Ask AI" placeholder if we found real stuff
+                const currentResults = results.filter(r => r.type !== 'ai');
 
-                    results.push({
+                materials.forEach((m: any) => {
+                    if (currentResults.some(r => r.id === m.id)) return;
+                    currentResults.push({
                         type: 'document',
                         id: m.id,
                         title: m.title,
                         subtitle: `${m.type} • ${m.source}`,
                         icon: m.source === "Supermemory Memory" ? Sparkles : FileText,
-                        action: () => m.source_link && window.open(m.source_link, '_blank')
+                        action: () => m.source_link ? window.open(m.source_link, '_blank') : null
                     });
                 });
 
-                // 5. AI Direct Question fallback (only if no results)
-                if (results.length === 0) {
-                    results.push({
-                        type: 'ai',
-                        title: `Ask AI: "${searchQuery}"`,
-                        subtitle: 'Send this question to the chatbot',
-                        icon: Sparkles,
-                        action: () => router.push(`/chat?q=${encodeURIComponent(searchQuery)}`)
-                    });
+                // Always append Ask AI at the bottom or if empty
+                if (currentResults.length === 0 || true) { // Always show Ask AI at bottom? No, generic
+                    if (currentResults.length === 0) {
+                        currentResults.push({
+                            type: 'ai',
+                            title: `Ask AI: "${searchQuery}"`,
+                            subtitle: 'Send this question to the chatbot',
+                            icon: Sparkles,
+                            action: () => router.push(`/chat?q=${encodeURIComponent(searchQuery)}`)
+                        });
+                    } else {
+                        // Optional: Add "Search in Chat" as last option?
+                        currentResults.push({
+                            type: 'ai',
+                            title: `Ask AI about "${searchQuery}"`,
+                            subtitle: 'Search purely in chat',
+                            icon: Sparkles,
+                            action: () => router.push(`/chat?q=${encodeURIComponent(searchQuery)}`)
+                        });
+                    }
                 }
 
-                setSearchResults([...results]); // Force re-render
+                setSearchResults([...currentResults]);
             } catch (err) {
                 console.error("Material search failed:", err);
-                if (results.length === 0) {
-                    results.push({
-                        type: 'ai',
-                        title: `Ask AI: "${searchQuery}"`,
-                        subtitle: 'Send this question to the chatbot',
-                        icon: Sparkles,
-                        action: () => router.push(`/chat?q=${encodeURIComponent(searchQuery)}`)
-                    });
-                }
-                setSearchResults(results);
             }
         };
 
         const timer = setTimeout(searchMaterials, 300);
-        setSearchResults(results);
         return () => clearTimeout(timer);
     }, [searchQuery, courses, gmailMaterials, router, toggleTheme]);
 
