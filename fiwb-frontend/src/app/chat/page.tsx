@@ -134,13 +134,9 @@ function MessageContent({ content, sources = [] }: { content: string; sources?: 
                                 <Layers size={14} className="text-blue-500" />
                             </div>
                             <div>
-                                <h5 className="text-[11px] font-black uppercase tracking-[0.25em] text-gray-500">Referred Docs</h5>
-                                <p className="text-[9px] text-gray-400 font-medium">Direct access to original materials</p>
+                                <h5 className="text-[11px] font-black uppercase tracking-[0.25em] text-gray-400">REFERRED DOCS</h5>
+                                <p className="text-[9px] text-gray-400/60 font-medium">Direct documentation access</p>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-2 px-3 py-1 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-full shadow-sm">
-                            <Quote size={10} className="text-blue-500/50" />
-                            <span className="text-[10px] font-black text-gray-600 dark:text-blue-400/80 uppercase tracking-tighter">{allBaseSources.length} Citations</span>
                         </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
@@ -745,9 +741,6 @@ function ChatBody() {
                                         )}
                                     </div>
                                     <div className="flex items-center gap-2 px-2 opacity-0 group-hover/message:opacity-100 transition-opacity">
-                                        <span className="text-[9px] uppercase tracking-widest font-black text-gray-700 dark:text-gray-600 mr-2">
-                                            {msg.role === "user" ? "Authorized User" : "Neural Synthesizer"}
-                                        </span>
 
                                         <button
                                             onClick={() => handleCopy(msg.content)}
