@@ -14,8 +14,9 @@ import { API_URL, standardize_email } from "@/utils/config";
 
 interface Source {
     title: string;
-    display: string;
+    display?: string;
     link?: string;
+    source_link?: string;
     snippet?: string;
     source_type?: string;
 }
@@ -151,10 +152,14 @@ function MessageContent({ content, sources = [], onOpenDocument }: MessageConten
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
                         {allBaseSources.map((baseTitle, idx) => {
-                            const matchedSource = sources.find(s => s.title.toLowerCase() === baseTitle.toLowerCase());
+                            const matchedSource = sources.find(s =>
+                                s.title.toLowerCase() === baseTitle.toLowerCase() ||
+                                baseTitle.toLowerCase().includes(s.title.toLowerCase()) ||
+                                s.title.toLowerCase().includes(baseTitle.toLowerCase())
+                            );
                             const citation = docCitations.find(d => d.baseTitle.toLowerCase() === baseTitle.toLowerCase());
-                            const displayTitle = matchedSource?.display || baseTitle;
-                            const link = matchedSource?.link;
+                            const displayTitle = matchedSource?.display || matchedSource?.title || baseTitle;
+                            const link = matchedSource?.link || matchedSource?.source_link;
                             const pages = citation?.pages;
                             const snippet = matchedSource?.snippet;
 
