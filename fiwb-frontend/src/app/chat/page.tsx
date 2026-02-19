@@ -907,11 +907,25 @@ function ChatBody() {
                                     <Paperclip size={20} />
                                 </button>
                                 <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileSelect} />
-                                <input
-                                    type="text" className="flex-1 bg-transparent border-none focus:outline-none text-gray-900 dark:text-white placeholder-gray-600 dark:placeholder-gray-600 font-bold py-3 text-sm px-2"
-                                    placeholder="Execute academic query..." value={input}
-                                    onChange={(e) => setInput(e.target.value)}
-                                    onKeyDown={(e) => e.key === "Enter" && !isLoading && sendMessage()}
+                                <textarea
+                                    rows={1}
+                                    className="flex-1 bg-transparent border-none focus:outline-none text-gray-900 dark:text-white placeholder-gray-600 dark:placeholder-gray-600 font-bold py-3 text-sm px-2 resize-none overflow-hidden leading-relaxed"
+                                    placeholder="Execute academic query..."
+                                    value={input}
+                                    onChange={(e) => {
+                                        setInput(e.target.value);
+                                        // Auto-resize
+                                        e.target.style.height = "auto";
+                                        e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
+                                    }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter" && !e.shiftKey && !isLoading) {
+                                            e.preventDefault();
+                                            sendMessage();
+                                            // Reset height after send
+                                            (e.target as HTMLTextAreaElement).style.height = "auto";
+                                        }
+                                    }}
                                     onPaste={handlePaste}
                                 />
                                 <button
