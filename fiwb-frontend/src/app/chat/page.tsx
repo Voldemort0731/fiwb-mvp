@@ -140,68 +140,73 @@ function MessageContent({ content, sources = [] }: { content: string; sources?: 
                         </div>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                        {allBaseSources.map((baseTitle, idx) => {
-                            const matchedSource = sources.find(s => s.title.toLowerCase() === baseTitle.toLowerCase());
-                            const citation = docCitations.find(d => d.baseTitle.toLowerCase() === baseTitle.toLowerCase());
-                            const displayTitle = matchedSource?.display || baseTitle;
-                            const link = matchedSource?.link;
-                            const pages = citation?.pages;
+                        {allBaseSources
+                            .filter(baseTitle => {
+                                const matched = sources.find(s => s.title.toLowerCase() === baseTitle.toLowerCase());
+                                return matched && matched.link;
+                            })
+                            .map((baseTitle, idx) => {
+                                const matchedSource = sources.find(s => s.title.toLowerCase() === baseTitle.toLowerCase());
+                                const citation = docCitations.find(d => d.baseTitle.toLowerCase() === baseTitle.toLowerCase());
+                                const displayTitle = matchedSource?.display || baseTitle;
+                                const link = matchedSource?.link;
+                                const pages = citation?.pages;
 
-                            return (
-                                <motion.div
-                                    key={idx}
-                                    initial={{ opacity: 0, scale: 0.95 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    transition={{ delay: idx * 0.03 }}
-                                    whileHover={{ y: -2 }}
-                                    className="group/source h-full"
-                                >
-                                    <div className="h-full flex flex-col p-3 rounded-2xl glass-dark border border-gray-200/50 dark:border-white/5 bg-white/70 dark:bg-black/60 hover:border-blue-500/40 hover:bg-blue-500/[0.02] transition-all duration-300 shadow-lg shadow-black/5">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <div className="p-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                                                <FileText size={14} className="text-blue-500" />
+                                return (
+                                    <motion.div
+                                        key={idx}
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        transition={{ delay: idx * 0.03 }}
+                                        whileHover={{ y: -2 }}
+                                        className="group/source h-full"
+                                    >
+                                        <div className="h-full flex flex-col p-3 rounded-2xl glass-dark border border-gray-200/50 dark:border-white/5 bg-white/70 dark:bg-black/60 hover:border-blue-500/40 hover:bg-blue-500/[0.02] transition-all duration-300 shadow-lg shadow-black/5">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <div className="p-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                                                    <FileText size={14} className="text-blue-500" />
+                                                </div>
+                                                {pages && (
+                                                    <span className="text-[9px] font-black text-blue-500/80 bg-blue-500/5 px-1.5 py-0.5 rounded border border-blue-500/10 uppercase">Pg {pages}</span>
+                                                )}
                                             </div>
-                                            {pages && (
-                                                <span className="text-[9px] font-black text-blue-500/80 bg-blue-500/5 px-1.5 py-0.5 rounded border border-blue-500/10 uppercase">Pg {pages}</span>
-                                            )}
-                                        </div>
 
-                                        {link ? (
-                                            <a href={link} target="_blank" rel="noopener noreferrer" className="block group/title">
-                                                <h4 className="text-[11px] font-bold text-gray-900 dark:text-gray-100 line-clamp-2 mb-2 leading-tight group-hover/title:text-blue-600 dark:group-hover/title:text-blue-400 transition-colors">
-                                                    {displayTitle}
-                                                </h4>
-                                            </a>
-                                        ) : (
-                                            <h4 className="text-[11px] font-bold text-gray-900 dark:text-gray-100 line-clamp-2 mb-2 leading-tight">
-                                                {displayTitle}
-                                            </h4>
-                                        )}
-
-                                        <div className="mt-auto pt-2 border-t border-gray-100 dark:border-white/5 flex items-center justify-between">
                                             {link ? (
-                                                <a
-                                                    href={link}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="flex items-center gap-1.5 text-[9px] font-black text-blue-500 uppercase tracking-wider hover:text-blue-600 transition-colors"
-                                                >
-                                                    <BookOpen size={10} />
-                                                    View Original
+                                                <a href={link} target="_blank" rel="noopener noreferrer" className="block group/title">
+                                                    <h4 className="text-[11px] font-bold text-gray-900 dark:text-gray-100 line-clamp-2 mb-2 leading-tight group-hover/title:text-blue-600 dark:group-hover/title:text-blue-400 transition-colors">
+                                                        {displayTitle}
+                                                    </h4>
                                                 </a>
                                             ) : (
-                                                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Legacy Asset</span>
+                                                <h4 className="text-[11px] font-bold text-gray-900 dark:text-gray-100 line-clamp-2 mb-2 leading-tight">
+                                                    {displayTitle}
+                                                </h4>
                                             )}
-                                            <div className="flex items-center gap-1">
-                                                <div className="w-4 h-4 rounded-full bg-blue-500/10 flex items-center justify-center">
-                                                    <Check size={8} className="text-blue-500" />
+
+                                            <div className="mt-auto pt-2 border-t border-gray-100 dark:border-white/5 flex items-center justify-between">
+                                                {link ? (
+                                                    <a
+                                                        href={link}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="flex items-center gap-1.5 text-[9px] font-black text-blue-500 uppercase tracking-wider hover:text-blue-600 transition-colors"
+                                                    >
+                                                        <BookOpen size={10} />
+                                                        View Original
+                                                    </a>
+                                                ) : (
+                                                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Legacy Asset</span>
+                                                )}
+                                                <div className="flex items-center gap-1">
+                                                    <div className="w-4 h-4 rounded-full bg-blue-500/10 flex items-center justify-center">
+                                                        <Check size={8} className="text-blue-500" />
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
-                                </motion.div>
-                            );
-                        })}
+                                    </motion.div>
+                                );
+                            })}
                     </div>
                 </div>
             )}
