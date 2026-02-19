@@ -134,13 +134,14 @@ export default function Dashboard() {
                 const currentResults = results.filter(r => r.type !== 'ai');
 
                 materials.forEach((m: any) => {
+                    if (m.source === "Supermemory Memory") return; // Filter out Supermemory memories
                     if (currentResults.some(r => r.id === m.id)) return;
                     currentResults.push({
                         type: 'document',
                         id: m.id,
                         title: m.title,
                         subtitle: `${m.type} • ${m.source}`,
-                        icon: m.source === "Supermemory Memory" ? Sparkles : FileText,
+                        icon: FileText,
                         action: () => m.source_link ? window.open(m.source_link, '_blank') : null
                     });
                 });
