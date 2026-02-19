@@ -169,13 +169,16 @@ async def chat_stream(
                 except: pass
 
             # 1. Classification first to decide if we need retrieval
+            yield f"data: EVENT:THINKING:Classifying intent...\n\n"
             q_type = await classify_query(message, attachment_base64)
             
             # 2. Retrieval (Skip if general chat)
             c_data = {}
             if q_type != "general_chat":
+                yield f"data: EVENT:THINKING:Searching your academic vault...\n\n"
                 c_data = await retriever.retrieve_context(message, q_type, history=short_term_history)
             else:
+                yield f"data: EVENT:THINKING:Personalizing response...\n\n"
                 # Even for general chat, we still fetch the profile for personalization
                 c_data = await retriever.retrieve_context(message, "general_chat", history=short_term_history)
             
@@ -214,6 +217,7 @@ async def chat_stream(
                 final_sources.append(s)
             
             if final_sources and q_type != "general_chat":
+                yield f"data: EVENT:THINKING:Broadcasting relevant sources...\n\n"
                 yield f"data: EVENT:SOURCES:{json.dumps(final_sources[:15])}\n\n"
             yield f"data: EVENT:THINKING:Synthesizing response...\n\n"
 
