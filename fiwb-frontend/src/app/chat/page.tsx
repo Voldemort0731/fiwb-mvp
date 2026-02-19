@@ -575,52 +575,44 @@ function ChatBody() {
                         if (!streamStarted) {
                             streamStarted = true;
                             setThinkingStep(null);
-                            setMessages(prev => [...prev, {
-                                role: "assistant",
-                                content: "",
-                                sources: accumulatedSources,
-                                isThinking: false
-                            }]);
+                            setMessages(prev => {
+                                const newMsgs = [...prev];
+                                const last = newMsgs[newMsgs.length - 1];
+                                if (last && last.role === "assistant" && last.isThinking) {
+                                    last.isThinking = false;
+                                    last.content = ""; // Clear process text to start real content
+                                    last.sources = accumulatedSources;
+                                } else {
+                                    newMsgs.push({
+                                        role: "assistant",
+                                        content: "",
+                                        sources: accumulatedSources,
+                                        isThinking: false
+                                    });
+                                }
+                                return newMsgs;
+                            });
                         }
 
-                        // Force flip thinking off if we have actual content
-                        setMessages(prev => {
-                            const newMsgs = [...prev];
-                            const last = newMsgs[newMsgs.length - 1];
-                            if (last && last.role === "assistant" && last.isThinking) {
-                                last.isThinking = false;
-                                last.content = "";
-                            }
-                            return newMsgs;
-                        });
-
-                        // Some chunks might be raw text or JSON token ({"token": "..."})
-                        // Try parsing JSON first (if backend sends streaming JSON)
+                        // Parse token from raw or JSON
                         let token = data;
-                        try {
-                            // Only try JSON parse if it looks like JSON structure
-                            if (data.startsWith("{") && data.endsWith("}")) {
-                                const json = JSON.parse(data);
-                                if (json.token) token = json.token;
-                            }
-                        } catch (e) {
-                            // Not JSON, use as raw string
+                        if (data.startsWith("{") && data.endsWith("}")) {
+                            try {
+                                const parsed = JSON.parse(data);
+                                if (parsed.token) token = parsed.token;
+                            } catch (e) { }
                         }
 
                         aiMessage += token;
-
                         setMessages(prev => {
                             const newMsgs = [...prev];
-                            const lastMsg = { ...newMsgs[newMsgs.length - 1] };
-
-                            if (lastMsg.role === "assistant") {
-                                lastMsg.content = aiMessage;
-                                // Continuously ensure sources are present
-                                if (accumulatedSources.length > 0) {
-                                    lastMsg.sources = accumulatedSources;
-                                }
+                            const last = { ...newMsgs[newMsgs.length - 1] };
+                            if (last.role === "assistant") {
+                                last.content = aiMessage;
+                                last.sources = accumulatedSources; // Ensure sources are kept
+                                last.isThinking = false; // Safety flip
                             }
-                            newMsgs[newMsgs.length - 1] = lastMsg;
+                            newMsgs[newMsgs.length - 1] = last;
                             return newMsgs;
                         });
                     }
@@ -746,9 +738,24 @@ function ChatBody() {
                                         )}
 
                                         {msg.isThinking ? (
-                                            <div className="flex items-center gap-3 py-2">
-                                                <RefreshCw size={14} className="text-blue-500 animate-spin" />
-                                                <span className="text-xs font-bold text-blue-500 animate-pulse">{msg.content || "Neural Synthesis Active..."}</span>
+                                            <div className="flex flex-col gap-4 py-2">
+                                                <div className="flex items-center gap-3">
+                                                    <RefreshCw size={14} className="text-blue-500 animate-spin" />
+                                                    <span className="text-xs font-bold text-blue-500 animate-pulse">{msg.content || "Neural Synthesis Active..."}</span>
+                                                </div>
+                                                {msg.sources && msg.sources.length > 0 && (
+                                                    <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100 dark:border-white/5">
+                                                        {msg.sources.slice(0, 3).map((s: any, idx: number) => (
+                                                            <div key={idx} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-blue-500/5 border border-blue-500/10 text-[9px] font-bold text-blue-500/70">
+                                                                <BookOpen size={9} />
+                                                                <span className="truncate max-w-[100px]">{s.title}</span>
+                                                            </div>
+                                                        ))}
+                                                        {msg.sources.length > 3 && (
+                                                            <span className="text-[9px] font-bold text-gray-400 mt-1">+{msg.sources.length - 3} more sources</span>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
                                         ) : (
                                             <MessageContent content={msg.content} sources={msg.sources} />
