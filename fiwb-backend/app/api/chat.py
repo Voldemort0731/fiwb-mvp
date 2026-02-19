@@ -168,40 +168,43 @@ async def chat_stream(
                 try: short_term_history = json.loads(history)
                 except: pass
 
-            res_class, res_retrieval = await asyncio.gather(
-                classify_query(message, attachment_base64),
-                retriever.retrieve_context(message, "academic_question", history=short_term_history),
-                return_exceptions=True
-            )
+            # 1. Classification first to decide if we need retrieval
+            q_type = await classify_query(message, attachment_base64)
             
-            q_type = res_class if not isinstance(res_class, Exception) else "general_chat"
-            c_data = res_retrieval if not isinstance(res_retrieval, Exception) else {}
-
-            # BROADCAST SOURCES (Dynamic)
+            # 2. Retrieval (Skip if general chat)
+            c_data = {}
+            if q_type != "general_chat":
+                c_data = await retriever.retrieve_context(message, q_type, history=short_term_history)
+            else:
+                # Even for general chat, we still fetch the profile for personalization
+                c_data = await retriever.retrieve_context(message, "general_chat", history=short_term_history)
+            
+            # BROADCAST SOURCES (Dynamic) - ONLY if not general chat
             sources_dict = {}
-            prefixes = {"course_context": "📚 ", "assistant_knowledge": "📧 ", "chat_assets": "📎 ", "memories": "🧠 "}
-            
-            for cat, prefix in prefixes.items():
-                for item in c_data.get(cat, []):
-                    meta = item.get("metadata", {})
-                    
-                    # Unified Title Logic (Matched with PromptArchitect)
-                    course_name = meta.get('course_name') or meta.get('course_id') or ""
-                    base_title = meta.get('title') or meta.get('file_name') or "Institutional Document"
-                    full_title = f"{base_title} [{course_name}]" if course_name else base_title
-                    
-                    if full_title not in sources_dict:
-                        sources_dict[full_title] = {
-                            "title": full_title,
-                            "display": f"{prefix}{full_title}",
-                            "link": meta.get("source_link") or meta.get("url") or meta.get("webViewLink") or meta.get("link"),
-                            "snippets": [item.get("content", "")],
-                            "source_type": meta.get("type", "document")
-                        }
-                    else:
-                        # Append more snippets (up to 3) for more complete context
-                        if len(sources_dict[full_title]["snippets"]) < 3:
-                            sources_dict[full_title]["snippets"].append(item.get("content", ""))
+            if q_type != "general_chat":
+                prefixes = {"course_context": "📚 ", "assistant_knowledge": "📧 ", "chat_assets": "📎 ", "memories": "🧠 "}
+                
+                for cat, prefix in prefixes.items():
+                    for item in c_data.get(cat, []):
+                        meta = item.get("metadata", {})
+                        
+                        # Unified Title Logic (Matched with PromptArchitect)
+                        course_name = meta.get('course_name') or meta.get('course_id') or ""
+                        base_title = meta.get('title') or meta.get('file_name') or "Institutional Document"
+                        full_title = f"{base_title} [{course_name}]" if course_name else base_title
+                        
+                        if full_title not in sources_dict:
+                            sources_dict[full_title] = {
+                                "title": full_title,
+                                "display": f"{prefix}{full_title}",
+                                "link": meta.get("source_link") or meta.get("url") or meta.get("webViewLink") or meta.get("link"),
+                                "snippets": [item.get("content", "")],
+                                "source_type": meta.get("type", "document")
+                            }
+                        else:
+                            # Append more snippets (up to 3) for more complete context
+                            if len(sources_dict[full_title]["snippets"]) < 3:
+                                sources_dict[full_title]["snippets"].append(item.get("content", ""))
 
             # Convert to final sources list and join snippets
             final_sources = []
@@ -210,7 +213,7 @@ async def chat_stream(
                 del s["snippets"]
                 final_sources.append(s)
             
-            if final_sources:
+            if final_sources and q_type != "general_chat":
                 yield f"data: EVENT:SOURCES:{json.dumps(final_sources[:15])}\n\n"
             yield f"data: EVENT:THINKING:Synthesizing response...\n\n"
 

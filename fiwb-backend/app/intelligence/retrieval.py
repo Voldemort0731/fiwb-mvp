@@ -99,12 +99,12 @@ Rules:
             # Course search
             self.sm_client.search(query=search_query, filters={"AND": course_filters}, limit=10) if query_type != "general_chat" else asyncio.sleep(0, result={}),
             # Memory search
-            self.sm_client.search(query=search_query, filters={"AND": memory_filters}, limit=10),
+            self.sm_client.search(query=search_query, filters={"AND": memory_filters}, limit=10) if query_type != "general_chat" else asyncio.sleep(0, result={}),
             # Assistant knowledge search
-            self.sm_client.search(query=search_query, filters={"AND": assistant_filters}, limit=5),
+            self.sm_client.search(query=search_query, filters={"AND": assistant_filters}, limit=5) if query_type != "general_chat" else asyncio.sleep(0, result={}),
             # Chat Assets search
-            self.sm_client.search(query=search_query, filters={"AND": chat_filters}, limit=5),
-            # Profile search
+            self.sm_client.search(query=search_query, filters={"AND": chat_filters}, limit=5) if query_type != "general_chat" else asyncio.sleep(0, result={}),
+            # Profile search (Always run for personalization)
             self.sm_client.search(query="User learning style preferences personal context assistant profile", filters={"AND": profile_filters}, limit=3)
         ]
 
