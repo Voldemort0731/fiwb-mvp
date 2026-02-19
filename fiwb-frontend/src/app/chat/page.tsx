@@ -597,12 +597,16 @@ function ChatBody() {
                             <Cpu size={22} className="text-blue-500 dark:text-blue-400" />
                         </div>
                         <div>
-                            <h2 className="text-lg font-black tracking-tight flex items-center gap-2 text-gray-900 dark:text-white">
-                                {activeThreadId === 'new' ? 'New Chat' : (threads.find(t => t.id === activeThreadId)?.title || 'Untitled Session')}
+                            <h2 className="text-lg font-black tracking-tight flex items-center gap-2">
+                                Neural <span className="text-blue-600 dark:text-blue-500">Workspace</span>
                             </h2>
-                            <p className="text-[9px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-500">
-                                {activeThreadId === 'new' ? 'Start a new conversation' : `Session: ${activeThreadId.slice(0, 8)}`}
-                            </p>
+                            <p className="text-[9px] font-black uppercase tracking-widest text-gray-700 dark:text-gray-500">Session: {activeThreadId === 'new' ? 'Uninitialized' : activeThreadId.slice(0, 8)}</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <div className="px-3 py-1.5 glass rounded-full border border-blue-500/10 flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)] animate-pulse" />
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Global Synapse Active</span>
                         </div>
                     </div>
                 </header>
