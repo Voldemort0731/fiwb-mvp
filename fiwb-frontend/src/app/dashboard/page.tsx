@@ -228,12 +228,20 @@ export default function Dashboard() {
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     onFocus={() => setIsSearchFocused(true)}
                                     onKeyDown={(e) => {
-                                        if (e.key === "Enter" && searchResults.length > 0) {
-                                            const topResult = searchResults[0];
-                                            if (topResult.action) topResult.action();
-                                            else if (topResult.id) router.push(`/course/${topResult.id}`);
-                                            setIsSearchFocused(false);
-                                            setSearchQuery("");
+                                        if (e.key === "Enter") {
+                                            e.preventDefault();
+                                            if (searchResults.length > 0) {
+                                                const topResult = searchResults[0];
+                                                if (topResult.action) topResult.action();
+                                                else if (topResult.id) router.push(`/course/${topResult.id}`);
+                                                setIsSearchFocused(false);
+                                                setSearchQuery("");
+                                            } else if (searchQuery.trim()) {
+                                                // Fallback to Ask AI if no recommendations yet
+                                                router.push(`/chat?q=${encodeURIComponent(searchQuery)}`);
+                                                setIsSearchFocused(false);
+                                                setSearchQuery("");
+                                            }
                                         }
                                     }}
                                     placeholder="Search Drive, Gmail, Classroom..."
