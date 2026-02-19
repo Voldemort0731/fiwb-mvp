@@ -17,6 +17,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "FIWB AI",
   description: "Institution-aware academic assistant",
+  icons: {
+    icon: "/fiwb-logo.svg",
+  },
 };
 
 import { AcademicProvider } from "@/context/AcademicContext";
