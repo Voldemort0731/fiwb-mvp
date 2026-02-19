@@ -496,74 +496,28 @@ function ChatBody() {
                             fetchThreads();
                         }
                     } else if (data.startsWith("EVENT:THINKING:")) {
+                        // ONLY update the thinkingStep state — never insert into messages
                         const step = data.replace("EVENT:THINKING:", "").trim();
                         setThinkingStep(step);
 
-                        if (!streamStarted) {
-                            streamStarted = true;
-                            setMessages(prev => [...prev, {
-                                role: "assistant",
-                                content: step,
-                                sources: accumulatedSources,
-                                isThinking: true
-                            }]);
-                        } else {
-                            setMessages(prev => {
-                                const newMsgs = [...prev];
-                                const last = newMsgs[newMsgs.length - 1];
-                                if (last.role === "assistant" && last.isThinking) {
-                                    last.content = step;
-                                }
-                                return newMsgs;
-                            });
-                        }
                     } else if (data.startsWith("EVENT:SOURCES:")) {
                         try {
                             const found = JSON.parse(data.replace("EVENT:SOURCES:", "").trim());
                             accumulatedSources = found;
                             setFoundSources(found);
-
-                            if (!streamStarted) {
-                                streamStarted = true;
-                                setMessages(prev => [...prev, {
-                                    role: "assistant",
-                                    content: "Retrieving Academic Intelligence...",
-                                    sources: found,
-                                    isThinking: true
-                                }]);
-                            } else {
-                                setMessages(prev => {
-                                    const newMsgs = [...prev];
-                                    const lastMsg = newMsgs[newMsgs.length - 1];
-                                    if (lastMsg && lastMsg.role === "assistant") {
-                                        lastMsg.sources = found;
-                                    }
-                                    return newMsgs;
-                                });
-                            }
                         } catch (e) { console.error("Error parsing sources", e); }
+
                     } else {
-                        // Regular token content
+                        // Regular token content — first real token clears the thinking card
                         if (!streamStarted) {
                             streamStarted = true;
                             setThinkingStep(null);
-                            setMessages(prev => {
-                                const newMsgs = [...prev];
-                                const last = newMsgs[newMsgs.length - 1];
-                                if (last && last.role === "assistant" && last.isThinking) {
-                                    last.isThinking = false;
-                                    last.content = ""; // Clear process text to start real content
-                                    last.sources = accumulatedSources;
-                                } else {
-                                    newMsgs.push({
-                                        role: "assistant",
-                                        content: "",
-                                        sources: accumulatedSources,
-                                        isThinking: false
-                                    });
-                                }
-                                return newMsgs;
-                            });
+                            setMessages(prev => [...prev, {
+                                role: "assistant",
+                                content: "",
+                                sources: accumulatedSources,
+                                isThinking: false
+                            }]);
                         }
 
                         // Parse token from raw or JSON
@@ -758,7 +712,7 @@ function ChatBody() {
 
                     {/* Standalone Thinking indicator (Pre-stream phase) */}
                     <AnimatePresence>
-                        {thinkingStep && !messages.some(m => m.role === 'assistant' && (m.isThinking || m.content)) && (
+                        {thinkingStep && isLoading && !messages.some(m => m.role === 'assistant' && !m.isThinking && m.content) && (
                             <motion.div
                                 initial={{ opacity: 0, y: 16 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -809,10 +763,10 @@ function ChatBody() {
                                             return (
                                                 <div key={i} className="flex items-center gap-2">
                                                     <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all duration-500 ${isActive
-                                                            ? "bg-blue-500 text-white shadow-lg shadow-blue-500/30"
-                                                            : isDone
-                                                                ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                                                                : "bg-gray-100 dark:bg-white/5 text-gray-400"
+                                                        ? "bg-blue-500 text-white shadow-lg shadow-blue-500/30"
+                                                        : isDone
+                                                            ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                                                            : "bg-gray-100 dark:bg-white/5 text-gray-400"
                                                         }`}>
                                                         {isDone ? <Check size={9} /> : isActive ? (
                                                             <motion.div
