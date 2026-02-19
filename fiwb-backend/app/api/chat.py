@@ -178,25 +178,40 @@ async def chat_stream(
             c_data = res_retrieval if not isinstance(res_retrieval, Exception) else {}
 
             # BROADCAST SOURCES (Dynamic)
-            sources = []
-            seen = set()
+            sources_dict = {}
             prefixes = {"course_context": "📚 ", "assistant_knowledge": "📧 ", "chat_assets": "📎 ", "memories": "🧠 "}
+            
             for cat, prefix in prefixes.items():
                 for item in c_data.get(cat, []):
                     meta = item.get("metadata", {})
-                    title = meta.get("title") or meta.get("file_name") or "Document"
-                    if title not in seen:
-                        seen.add(title)
-                        sources.append({
-                            "title": title, 
-                            "display": f"{prefix}{title}",
+                    
+                    # Unified Title Logic (Matched with PromptArchitect)
+                    course_name = meta.get('course_name') or meta.get('course_id') or ""
+                    base_title = meta.get('title') or meta.get('file_name') or "Institutional Document"
+                    full_title = f"{base_title} [{course_name}]" if course_name else base_title
+                    
+                    if full_title not in sources_dict:
+                        sources_dict[full_title] = {
+                            "title": full_title,
+                            "display": f"{prefix}{full_title}",
                             "link": meta.get("source_link") or meta.get("url"),
-                            "snippet": item.get("content", ""),
+                            "snippets": [item.get("content", "")],
                             "source_type": meta.get("type", "document")
-                        })
+                        }
+                    else:
+                        # Append more snippets (up to 3) for more complete context
+                        if len(sources_dict[full_title]["snippets"]) < 3:
+                            sources_dict[full_title]["snippets"].append(item.get("content", ""))
+
+            # Convert to final sources list and join snippets
+            final_sources = []
+            for s in sources_dict.values():
+                s["snippet"] = "\n--- [Next Section] ---\n".join([snp for snp in s["snippets"] if snp])
+                del s["snippets"]
+                final_sources.append(s)
             
-            if sources:
-                yield f"data: EVENT:SOURCES:{json.dumps(sources[:15])}\n\n"
+            if final_sources:
+                yield f"data: EVENT:SOURCES:{json.dumps(final_sources[:15])}\n\n"
             yield f"data: EVENT:THINKING:Synthesizing response...\n\n"
 
             # CONSTRUCT SYSTEM PROMPT

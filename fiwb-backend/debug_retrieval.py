@@ -1,43 +1,26 @@
+
 import asyncio
-from app.supermemory.client import SupermemoryClient
-from app.config import settings
+import os
+import json
+from app.intelligence.retrieval import RetrievalOrchestrator
+from app.utils.config import Config
 
-async def debug_retrieval():
-    course_id = "843626074076" # Known course ID from previous logs
-    user_email = "siddhantwagh724@gmail.com"
+async def test_retrieval():
+    # Attempt to test with a dummy or real email if we can find one in logs
+    email = "sidwadhwa07@gmail.com" # Common email in previous logs
+    retriever = RetrievalOrchestrator(email)
     
-    print(f"DEBUG: Testing retrieval for User: {user_email}, Course: {course_id}")
+    print(f"--- TESTING RETRIEVAL FOR {email} ---")
+    query = "Syllabus"
+    context = await retriever.retrieve_context(query, "academic_question")
     
-    sm = SupermemoryClient()
-    
-    # 1. Try with the filters we use in the app
-    filters = {
-        "AND": [
-            {"key": "course_id", "value": course_id},
-            {"key": "user_id", "value": user_email}
-        ]
-    }
-    
-    print("\n--- Test 1: Query=' ' (Single Space) ---")
-    res1 = await sm.search(query=" ", filters=filters, limit=10)
-    print(f"Result Count: {len(res1.get('chunks', []))}")
-    
-    print("\n--- Test 2: Query='*' (Wildcard) ---")
-    res2 = await sm.search(query="*", filters=filters, limit=10)
-    print(f"Result Count: {len(res2.get('chunks', []))}")
-
-    print("\n--- Test 3: No Query, Just Filters ---")
-    # Some vector DBs behave differently with empty/null query
-    res3 = await sm.search(query="", filters=filters, limit=10) 
-    print(f"Result Count: {len(res3.get('chunks', []))}")
-
-    print("\n--- Test 4: Looser Filters (Just User) ---")
-    user_filter = {"AND": [{"key": "user_id", "value": user_email}]}
-    res4 = await sm.search(query="*", filters=user_filter, limit=10)
-    print(f"Result Count: {len(res4.get('chunks', []))}")
-    if res4.get('chunks'):
-        print("Sample metadata from Test 4:")
-        print(res4['chunks'][0].get('metadata'))
+    print("\n[COURSE CONTEXT]:")
+    for chunk in context.get("course_context", []):
+        meta = chunk.get("metadata", {})
+        print(f"Title: {meta.get('title')} | File: {meta.get('file_name')} | Course: {meta.get('course_name')}")
+        print(f"Content Preview: {chunk.get('content')[:100]}...\n")
 
 if __name__ == "__main__":
-    asyncio.run(debug_retrieval())
+    # Ensure env is loaded or config is accessible
+    # This might need to be run from the backend directory
+    asyncio.run(test_retrieval())

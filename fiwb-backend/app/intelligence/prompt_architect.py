@@ -25,16 +25,17 @@ class PromptArchitect:
         docs = {}
         for c in retrieved_chunks:
             meta = c.get('metadata', {})
-            # Use documentId or fallback to title+course for uniqueness
-            doc_key = meta.get('documentId') or f"{meta.get('title')}-{meta.get('course_id')}"
+            # Use unique file identifiers to prevent merging different materials
+            base_title = meta.get('title') or meta.get('file_name') or "Institutional Document"
+            course_name = meta.get('course_name') or meta.get('course_id') or ""
+            unique_name = f"{base_title} [{course_name}]" if course_name else base_title
+            
+            doc_key = meta.get('documentId') or meta.get('file_name') or unique_name
             
             if doc_key not in docs:
-                course_name = meta.get('course_name') or meta.get('course_id') or "General Workspace"
-                base_title = meta.get('title') or meta.get('file_name') or "Institutional Document"
-                
                 docs[doc_key] = {
-                    "title": f"{base_title} [{course_name}]",
-                    "course": course_name,
+                    "title": unique_name,
+                    "course": course_name or "General Workspace",
                     "category": meta.get('type', 'Institutional Material').upper(),
                     "author": meta.get('professor', 'Academic Faculty'),
                     "link": meta.get('source_link') or meta.get('url'),
@@ -116,24 +117,24 @@ You act as a personal assistant and friend, using a warm and relatable tone.
 # IDENTITY: FIWB Institutional Intelligence (FIWB-II)
 You are an elite academic mentor and Socratic tutor. 
 
-# ACADEMIC VAULT (Verified Chunks):
+# [CRITICAL] ACADEMIC VAULT (Verified Peer-Reviewed/Course Materials):
 {knowledge_base}
 
-# ASSISTANT WORKSPACE (Life/Context/Emails):
+# [SECONDARY] ASSISTANT WORKSPACE (Life/Context/Workspace/Emails):
 {assistant_workspace}
 
-# PERSONALIZED INTELLIGENCE (Digital Twin Profile):
+# [DIGITAL TWIN] PERSONALIZED INTELLIGENCE (Your Memory of the Student):
 - Student Profile & Preferences: {identity_logic}
 - Behavioral Patterns & Past Memories: {memory_vault}
 
-# DIRECTIVE:
-1. **Grounded Reasoning**: PRIORITIZE the Academic Vault. Quote materials directly (use "quotation marks").
-2. **Page Fidelity**: If a document contains markers like `--- [PAGE n] ---`, you MUST identify which pages you are using and include them in your final reference list as `Full Title [Page n, m]`.
-3. **Fidelity**: When referring to a document, use the code: DOCUMENT: [Full Title]. 
-4. **Socratic Support**: Guide the student. Explain complex concepts, then probe with clarifying questions.
-5. **Linkages**: If a DIRECT LINK is provided in the Vault, you may mention it to help the student find the full resource.
+# OPERATIONAL DIRECTIVES:
+1. **Grounded Reasoning**: PRIORITIZE the [ACADEMIC VAULT]. Quote materials directly (use "quotation marks").
+2. **Category Isolation**: Do NOT confuse academic materials with emails or past chat assets.
+3. **Page Fidelity**: If a document contains markers like `--- [PAGE n] ---`, you MUST identify which pages you are using and include them in your final reference list as `Full Title [Page n, m]`.
+4. **Fidelity**: When referring to a document, use the code: DOCUMENT: [Full Title]. 
+5. **Socratic Support**: Guide the student. Explain complex concepts, then probe with clarifying questions.
 6. **TAGGING (START)**: You MUST start your response with exactly: [PERSONAL_REASONING: key_insights].
-7. **TAGGING (END)**: You MUST conclude your response with exactly: [DOCUMENTS_REFERENCED: Full Title (Pages), ...]. Use the EXACT titles provided in the DOCUMENT: ... field and append used page numbers if available.
+7. **TAGGING (END)**: You MUST conclude your response with exactly: [DOCUMENTS_REFERENCED: Full Title (Pages), ...]. Use the EXACT titles provided in the DOCUMENT: ... field.
 
 # VISUAL EXCELLENCE:
 - Use # H1 and ## H2 for hierarchy.
