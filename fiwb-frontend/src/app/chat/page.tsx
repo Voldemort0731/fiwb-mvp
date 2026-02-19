@@ -714,95 +714,92 @@ function ChatBody() {
                         </div>
                     )}
 
+
                     {/* Standalone Thinking indicator (Pre-stream phase) */}
-                    <AnimatePresence>
-                        {thinkingStep && isLoading && !streamingActive && (
-                            <motion.div
-                                initial={{ opacity: 0, y: 16 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.95 }}
-                                transition={{ duration: 0.3, ease: "easeOut" }}
-                                className="flex flex-col items-start max-w-[90%] lg:max-w-[75%] mb-4 mt-8"
-                            >
-                                <div className="w-full bg-white dark:bg-[#0a0a0f] border border-blue-500/20 rounded-[1.75rem] p-5 shadow-2xl shadow-blue-500/5 relative overflow-hidden">
-                                    {/* Animated top border */}
-                                    <div className="absolute top-0 left-0 h-[2px] w-full overflow-hidden rounded-t-[1.75rem]">
+                    {isLoading && !streamingActive && (
+                        <motion.div
+                            key="thinking-card"
+                            initial={{ opacity: 0, y: 12 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.25 }}
+                            className="flex flex-col items-start max-w-[90%] lg:max-w-[75%] mb-4 mt-8"
+                        >
+                            <div className="w-full bg-white dark:bg-[#0a0a0f] border border-blue-500/20 rounded-[1.75rem] p-5 shadow-2xl shadow-blue-500/5 relative overflow-hidden">
+                                {/* Animated top border */}
+                                <div className="absolute top-0 left-0 h-[2px] w-full overflow-hidden rounded-t-[1.75rem]">
+                                    <motion.div
+                                        className="h-full bg-gradient-to-r from-transparent via-blue-500 to-transparent w-[60%]"
+                                        animate={{ x: ["-100%", "250%"] }}
+                                        transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+                                    />
+                                </div>
+
+                                {/* Header */}
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="relative w-8 h-8 rounded-xl bg-blue-600/10 flex items-center justify-center border border-blue-500/20">
+                                        <Sparkles size={15} className="text-blue-500" />
                                         <motion.div
-                                            className="h-full bg-gradient-to-r from-transparent via-blue-500 to-transparent w-[60%]"
-                                            animate={{ x: ["-100%", "250%"] }}
-                                            transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
+                                            className="absolute inset-0 rounded-xl bg-blue-500/10"
+                                            animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0, 0.5] }}
+                                            transition={{ duration: 2, repeat: Infinity }}
                                         />
                                     </div>
-
-                                    {/* Header */}
-                                    <div className="flex items-center gap-3 mb-4">
-                                        <div className="relative w-8 h-8 rounded-xl bg-blue-600/10 flex items-center justify-center border border-blue-500/20">
-                                            <Sparkles size={15} className="text-blue-500" />
-                                            <motion.div
-                                                className="absolute inset-0 rounded-xl bg-blue-500/10"
-                                                animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0, 0.5] }}
-                                                transition={{ duration: 2, repeat: Infinity }}
-                                            />
-                                        </div>
-                                        <div>
-                                            <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em]">Neural Engine</p>
-                                            <p className="text-xs font-bold text-gray-900 dark:text-white">{thinkingStep}</p>
-                                        </div>
-                                    </div>
-
-                                    {/* Step Pipeline */}
-                                    <div className="flex items-center gap-2">
-                                        {[
-                                            { label: "Classifying", match: ["Classifying", "intent"] },
-                                            { label: "Retrieving", match: ["Searching", "Personalizing"] },
-                                            { label: "Broadcasting", match: ["Broadcasting"] },
-                                            { label: "Synthesizing", match: ["Synthesizing"] },
-                                        ].map((step, i) => {
-                                            const isActive = step.match.some(kw => thinkingStep?.includes(kw));
-                                            const isDone = (() => {
-                                                const order = ["Classifying", "Retrieving", "Broadcasting", "Synthesizing"];
-                                                const currentIdx = order.findIndex(o => step.match.some(kw => thinkingStep?.includes(kw)));
-                                                return i < currentIdx;
-                                            })();
-                                            return (
-                                                <div key={i} className="flex items-center gap-2">
-                                                    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all duration-500 ${isActive
-                                                        ? "bg-blue-500 text-white shadow-lg shadow-blue-500/30"
-                                                        : isDone
-                                                            ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                                                            : "bg-gray-100 dark:bg-white/5 text-gray-400"
-                                                        }`}>
-                                                        {isDone ? <Check size={9} /> : isActive ? (
-                                                            <motion.div
-                                                                className="w-2 h-2 rounded-full bg-white"
-                                                                animate={{ scale: [1, 1.4, 1] }}
-                                                                transition={{ duration: 0.8, repeat: Infinity }}
-                                                            />
-                                                        ) : <div className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-white/20" />}
-                                                        {step.label}
-                                                    </div>
-                                                    {i < 3 && <div className={`w-4 h-px transition-colors duration-500 ${isDone || isActive ? "bg-blue-400/50" : "bg-gray-200 dark:bg-white/5"}`} />}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-
-                                    {/* Pulsing dots */}
-                                    <div className="flex items-center gap-1.5 mt-4">
-                                        {[0, 1, 2].map(i => (
-                                            <motion.div
-                                                key={i}
-                                                className="w-1.5 h-1.5 rounded-full bg-blue-400"
-                                                animate={{ opacity: [0.2, 1, 0.2], y: [0, -3, 0] }}
-                                                transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
-                                            />
-                                        ))}
-                                        <span className="text-[10px] text-gray-400 font-medium ml-1">Processing...</span>
+                                    <div>
+                                        <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em]">Neural Engine</p>
+                                        <p className="text-xs font-bold text-gray-900 dark:text-white">{thinkingStep || "Processing..."}</p>
                                     </div>
                                 </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
+
+                                {/* Step Pipeline */}
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    {[
+                                        { label: "Classifying", match: ["Classifying", "intent"] },
+                                        { label: "Retrieving", match: ["Searching", "Personalizing"] },
+                                        { label: "Broadcasting", match: ["Broadcasting"] },
+                                        { label: "Synthesizing", match: ["Synthesizing"] },
+                                    ].map((step, i) => {
+                                        const stepOrder = ["Classifying", "Retrieving", "Broadcasting", "Synthesizing"];
+                                        const activeIdx = stepOrder.findIndex((_, idx) =>
+                                            [["Classifying", "intent"], ["Searching", "Personalizing"], ["Broadcasting"], ["Synthesizing"]][idx].some(kw => thinkingStep?.includes(kw))
+                                        );
+                                        const isActive = step.match.some(kw => thinkingStep?.includes(kw));
+                                        const isDone = i < activeIdx;
+                                        return (
+                                            <div key={i} className="flex items-center gap-2">
+                                                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all duration-500 ${isActive ? "bg-blue-500 text-white shadow-lg shadow-blue-500/30"
+                                                        : isDone ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                                                            : "bg-gray-100 dark:bg-white/5 text-gray-400"
+                                                    }`}>
+                                                    {isDone ? <Check size={9} /> : isActive ? (
+                                                        <motion.div
+                                                            className="w-2 h-2 rounded-full bg-white"
+                                                            animate={{ scale: [1, 1.4, 1] }}
+                                                            transition={{ duration: 0.8, repeat: Infinity }}
+                                                        />
+                                                    ) : <div className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-white/20" />}
+                                                    {step.label}
+                                                </div>
+                                                {i < 3 && <div className={`w-4 h-px transition-colors duration-500 ${isDone || isActive ? "bg-blue-400/50" : "bg-gray-200 dark:bg-white/5"}`} />}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Pulsing dots */}
+                                <div className="flex items-center gap-1.5 mt-4">
+                                    {[0, 1, 2].map(i => (
+                                        <motion.div
+                                            key={i}
+                                            className="w-1.5 h-1.5 rounded-full bg-blue-400"
+                                            animate={{ opacity: [0.2, 1, 0.2], y: [0, -3, 0] }}
+                                            transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
+                                        />
+                                    ))}
+                                    <span className="text-[10px] text-gray-400 font-medium ml-1">Processing...</span>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
 
                     <div ref={messagesEndRef} />
 
@@ -943,8 +940,8 @@ function ChatBody() {
                         </div>
                     </div>
                 </footer>
-            </main>
-        </div>
+            </main >
+        </div >
     );
 }
 
