@@ -398,7 +398,7 @@ function ChatBody() {
         return () => document.removeEventListener('mousedown', closePopup);
     }, []);
 
-    const sendMessage = async (forcedContent?: string) => {
+    const sendMessage = async (forcedContent?: string, threadIdOverride?: string) => {
         const contentToUse = typeof forcedContent === "string" ? forcedContent : input;
         if (!contentToUse.trim() && !selectedFile) return;
 
@@ -442,7 +442,7 @@ function ChatBody() {
             const formData = new FormData();
             formData.append("message", userMsg);
             formData.append("user_email", email);
-            formData.append("thread_id", activeThreadId);
+            formData.append("thread_id", threadIdOverride || activeThreadId);
 
             const chatHistory = messages.slice(-5).map(m => ({ role: m.role, content: m.content }));
             formData.append("history", JSON.stringify(chatHistory));
@@ -565,7 +565,7 @@ function ChatBody() {
             initializedRef.current = true;
             setActiveThreadId("new");
             setMessages([]);
-            sendMessage(q);
+            sendMessage(q, "new");
 
             // Clean up URL
             const url = new URL(window.location.href);
