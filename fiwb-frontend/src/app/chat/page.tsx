@@ -14,10 +14,8 @@ import { API_URL, standardize_email } from "@/utils/config";
 
 interface Source {
     title: string;
-    display?: string;
+    display: string;
     link?: string;
-    source_link?: string;
-    url?: string;
     snippet?: string;
     source_type?: string;
 }
@@ -25,7 +23,7 @@ interface Source {
 interface MessageContentProps {
     content: string;
     sources?: Source[];
-    onOpenDocument?: (url: string, title: string) => void;
+    onOpenDocument?: (url: string | null, title: string, content?: string) => void;
 }
 
 function MessageContent({ content, sources = [], onOpenDocument }: MessageContentProps) {
@@ -153,18 +151,10 @@ function MessageContent({ content, sources = [], onOpenDocument }: MessageConten
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
                         {allBaseSources.map((baseTitle, idx) => {
-                            // Enhanced Fuzzy Matcher: Handles prefixes, courses, and partial titles
-                            const matchedSource = sources.find(s => {
-                                const sTitle = s.title.toLowerCase();
-                                const bTitle = baseTitle.toLowerCase();
-                                return sTitle === bTitle ||
-                                    sTitle.includes(bTitle) ||
-                                    bTitle.includes(sTitle) ||
-                                    sTitle.replace(/\[.*?\]/g, '').trim() === bTitle.replace(/\[.*?\]/g, '').trim();
-                            });
+                            const matchedSource = sources.find(s => s.title.toLowerCase() === baseTitle.toLowerCase());
                             const citation = docCitations.find(d => d.baseTitle.toLowerCase() === baseTitle.toLowerCase());
-                            const displayTitle = matchedSource?.display || matchedSource?.title || baseTitle;
-                            const link = matchedSource?.link || matchedSource?.source_link || matchedSource?.url;
+                            const displayTitle = matchedSource?.display || baseTitle;
+                            const link = matchedSource?.link;
                             const pages = citation?.pages;
                             const snippet = matchedSource?.snippet;
 
@@ -196,13 +186,13 @@ function MessageContent({ content, sources = [], onOpenDocument }: MessageConten
 
                                         {link ? (
                                             <button
-                                                onClick={(e) => {
+                                                onClick={(e: React.MouseEvent) => {
                                                     e.preventDefault();
-                                                    if (onOpenDocument) onOpenDocument(link, displayTitle);
+                                                    if (onOpenDocument) onOpenDocument(link || null, displayTitle, snippet);
                                                 }}
                                                 className="block group/title text-left w-full"
                                             >
-                                                <h4 className="text-[12px] font-black text-gray-900 dark:text-gray-100 line-clamp-2 mb-3 leading-tight group-hover/title:text-blue-600 dark:group-hover/title:text-blue-400 group-hover/title:underline transition-colors">
+                                                <h4 className="text-[12px] font-black text-gray-900 dark:text-gray-100 line-clamp-2 mb-3 leading-tight group-hover/title:text-blue-600 dark:group-hover/title:text-blue-400 transition-colors">
                                                     {displayTitle}
                                                 </h4>
                                             </button>
@@ -214,31 +204,29 @@ function MessageContent({ content, sources = [], onOpenDocument }: MessageConten
 
 
                                         <div className="mt-auto pt-3 border-t border-gray-100 dark:border-white/5 flex items-center justify-between">
-                                            {displayTitle ? (
+                                            {link ? (
                                                 <div className="flex items-center gap-2">
                                                     <button
-                                                        onClick={() => onOpenDocument?.(link || "", displayTitle)}
+                                                        onClick={() => onOpenDocument?.(link || null, displayTitle, snippet)}
                                                         className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-lg shadow-blue-600/20 active:scale-95"
                                                     >
                                                         <Zap size={10} />
-                                                        Open in Vault
+                                                        Focus View
                                                     </button>
-                                                    {link && (
-                                                        <a
-                                                            href={link}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg text-gray-400 hover:text-blue-500 transition-colors"
-                                                            title="Open in new tab"
-                                                        >
-                                                            <RefreshCw size={12} />
-                                                        </a>
-                                                    )}
+                                                    <a
+                                                        href={link}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg text-gray-400 hover:text-blue-500 transition-colors"
+                                                        title="Open in new tab"
+                                                    >
+                                                        <RefreshCw size={12} />
+                                                    </a>
                                                 </div>
                                             ) : (
-                                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:border-white/5 text-gray-500 rounded-xl text-[10px] font-black uppercase tracking-wider opacity-60">
+                                                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-white/5 text-gray-500 rounded-xl text-[10px] font-black uppercase tracking-wider opacity-60">
                                                     <Settings size={10} />
-                                                    Citation Only
+                                                    Legacy Asset
                                                 </div>
                                             )}
                                             <div className="flex items-center -space-x-1">
@@ -267,7 +255,6 @@ function ChatBody() {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const textInputRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const searchParams = useSearchParams();
 
@@ -397,28 +384,6 @@ function ChatBody() {
     const [activeDocumentUrl, setActiveDocumentUrl] = useState<string | null>(null);
     const [activeDocumentTitle, setActiveDocumentTitle] = useState<string | null>(null);
     const [activeDocumentContent, setActiveDocumentContent] = useState<string | null>(null);
-    const [isOriginalView, setIsOriginalView] = useState(false);
-    const [isLoadingDoc, setIsLoadingDoc] = useState(false);
-
-    const handleOpenDocument = async (url: string, title: string) => {
-        setActiveDocumentUrl(url);
-        setActiveDocumentTitle(title);
-        setIsOriginalView(false); // Default to AI Reader view
-        setIsLoadingDoc(true);
-        setActiveDocumentContent(null);
-
-        try {
-            const email = standardize_email(localStorage.getItem("user_email") || "");
-            const res = await fetch(`${API_URL}/api/search/content?title=${encodeURIComponent(title)}&user_email=${email}`);
-            const data = await res.json();
-            setActiveDocumentContent(data.content);
-        } catch (e) {
-            console.error("Failed to fetch doc content", e);
-            setActiveDocumentContent("System Error: Could not synchronize with vault data. Try Original Source View.");
-        } finally {
-            setIsLoadingDoc(false);
-        }
-    };
 
     // Track if user has scrolled up
     const handleScroll = (e: any) => {
@@ -449,7 +414,7 @@ function ChatBody() {
         if (rect.width > 0 && rect.height > 0) {
             setSelectionPopup({
                 x: rect.left + (rect.width / 2) - 60, // Center (approx 120px width)
-                y: Math.max(10, rect.top - 60), // Position above the selection, with safely buffer
+                y: rect.top - 50, // Position above the selection
                 text: selection.toString()
             });
         }
@@ -693,7 +658,7 @@ function ChatBody() {
                 threads={threads}
                 activeThreadId={activeThreadId}
                 onThreadSelect={handleThreadSelect}
-                onNewChat={() => { setActiveThreadId("new"); setMessages([]); setActiveDocumentUrl(null); }}
+                onNewChat={() => { setActiveThreadId("new"); setMessages([]); setActiveDocumentUrl(null); setActiveDocumentContent(null); }}
                 onDeleteThread={handleDeleteThread}
             />
             <div className="flex-1 flex overflow-hidden">
@@ -808,7 +773,11 @@ function ChatBody() {
                                                 <MessageContent
                                                     content={msg.content}
                                                     sources={msg.sources}
-                                                    onOpenDocument={handleOpenDocument}
+                                                    onOpenDocument={(url, title, content) => {
+                                                        setActiveDocumentUrl(url);
+                                                        setActiveDocumentTitle(title);
+                                                        setActiveDocumentContent(content || null);
+                                                    }}
                                                 />
                                             )}
                                         </div>
@@ -885,9 +854,9 @@ function ChatBody() {
                                         onMouseDown={(e) => {
                                             e.preventDefault();
                                             e.stopPropagation();
-                                            setInput(`Explain this segment: "${selectionPopup.text}"`);
+                                            setInput(`Explain this: "${selectionPopup.text}"`);
                                             setSelectionPopup(null);
-                                            setTimeout(() => textInputRef.current?.focus(), 100);
+                                            setTimeout(() => fileInputRef.current?.focus(), 50);
                                         }}
                                         className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-full text-xs font-bold shadow-sm hover:bg-blue-500 transition-all whitespace-nowrap"
                                     >
@@ -971,7 +940,6 @@ function ChatBody() {
                                     </button>
                                     <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileSelect} />
                                     <input
-                                        ref={textInputRef}
                                         type="text" className="flex-1 bg-transparent border-none focus:outline-none text-gray-900 dark:text-white placeholder-gray-600 dark:placeholder-gray-600 font-bold py-3 text-sm px-2"
                                         placeholder="Execute academic query..." value={input}
                                         onChange={(e) => setInput(e.target.value)}
@@ -993,7 +961,7 @@ function ChatBody() {
                 </main>
 
                 <AnimatePresence>
-                    {activeDocumentTitle && (
+                    {activeDocumentUrl && (
                         <motion.div
                             initial={{ x: '100%', opacity: 0 }}
                             animate={{ x: 0, opacity: 1 }}
@@ -1012,35 +980,17 @@ function ChatBody() {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    {activeDocumentUrl && (
-                                        <>
-                                            <button
-                                                onClick={() => setIsOriginalView(!isOriginalView)}
-                                                className={clsx(
-                                                    "flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-                                                    isOriginalView
-                                                        ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
-                                                        : "bg-gray-100 dark:bg-white/5 text-gray-400 hover:text-blue-500"
-                                                )}
-                                                title={isOriginalView ? "Switch to AI Reader" : "Switch to Original Source"}
-                                            >
-                                                {isOriginalView ? <Zap size={10} /> : <BookOpen size={10} />}
-                                                {isOriginalView ? "Original" : "Neural"}
-                                            </button>
-                                            <div className="w-[1px] h-4 bg-gray-200 dark:bg-white/10 mx-1" />
-                                            <a
-                                                href={activeDocumentUrl || undefined}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-500/5 rounded-xl transition-all"
-                                                title="Open in Full Window"
-                                            >
-                                                <RefreshCw size={20} />
-                                            </a>
-                                        </>
-                                    )}
+                                    <a
+                                        href={activeDocumentUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-500/5 rounded-xl transition-all"
+                                        title="Open in Full Window"
+                                    >
+                                        <RefreshCw size={20} />
+                                    </a>
                                     <button
-                                        onClick={() => { setActiveDocumentUrl(null); setActiveDocumentTitle(null); setActiveDocumentContent(null); }}
+                                        onClick={() => setActiveDocumentUrl(null)}
                                         className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-500/5 rounded-xl transition-all"
                                         title="Close Workspace"
                                     >
@@ -1048,46 +998,52 @@ function ChatBody() {
                                     </button>
                                 </div>
                             </div>
-                            <div className="flex-1 w-full relative bg-white dark:bg-[#050505] overflow-y-auto scrollbar-premium" onMouseUp={handleSelection}>
-                                {isOriginalView ? (
-                                    <iframe
-                                        src={activeDocumentUrl || undefined}
-                                        className="w-full h-full border-none"
-                                        title="Institutional Document Viewer"
-                                    />
-                                ) : (
-                                    <div className="p-8 sm:p-12 max-w-4xl mx-auto">
-                                        {isLoadingDoc ? (
-                                            <div className="flex flex-col items-center justify-center min-h-[400px] space-y-6">
-                                                <div className="w-16 h-16 rounded-3xl bg-blue-500/5 flex items-center justify-center border border-blue-500/10 shadow-inner">
-                                                    <RefreshCw size={24} className="text-blue-500 animate-spin" />
+                            <div className="flex-1 w-full relative bg-white dark:bg-black/20 overflow-hidden">
+                                {activeDocumentUrl ? (
+                                    (() => {
+                                        let embedUrl = activeDocumentUrl;
+                                        if (embedUrl?.includes('drive.google.com') && !embedUrl.includes('preview')) {
+                                            embedUrl = embedUrl.replace('/view', '/preview');
+                                        }
+                                        return (
+                                            <iframe
+                                                src={embedUrl}
+                                                className="w-full h-full border-none"
+                                                title="Institutional Document Viewer"
+                                            />
+                                        );
+                                    })()
+                                ) : activeDocumentContent ? (
+                                    <div className="h-full overflow-y-auto p-12 scrollbar-premium bg-white dark:bg-[#0a0a0a]">
+                                        <div className="max-w-3xl mx-auto space-y-8">
+                                            <div className="flex items-center gap-3 pb-6 border-b border-gray-100 dark:border-white/5">
+                                                <div className="p-3 rounded-2xl bg-blue-500/10 text-blue-500 border border-blue-500/20">
+                                                    <Bot size={24} />
                                                 </div>
-                                                <div className="text-center space-y-2">
-                                                    <span className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-500/50 block">Neural Decryption</span>
-                                                    <p className="text-sm font-bold text-gray-400">Syncing with Digital Twin's Vault...</p>
+                                                <div>
+                                                    <h2 className="text-2xl font-black tracking-tight">{activeDocumentTitle}</h2>
+                                                    <p className="text-[10px] font-black uppercase tracking-widest text-blue-500">Verified Academic Intelligence Content</p>
                                                 </div>
                                             </div>
-                                        ) : (
-                                            <div className="markdown-content prose dark:prose-invert prose-blue max-w-none animate-in fade-in slide-in-from-bottom-4 duration-700">
-                                                <ReactMarkdown
-                                                    remarkPlugins={[remarkGfm, remarkMath]}
-                                                    rehypePlugins={[rehypeKatex]}
-                                                    components={{
-                                                        p: ({ children }) => <p className="mb-6 leading-relaxed text-gray-800 dark:text-gray-200 font-medium text-base">{children}</p>,
-                                                        h1: ({ children }) => <h1 className="text-3xl font-black mb-8 text-gray-900 dark:text-white border-b border-gray-100 dark:border-white/5 pb-4">{children}</h1>,
-                                                        h2: ({ children }) => <h2 className="text-2xl font-black mb-6 mt-12 text-gray-900 dark:text-white flex items-center gap-3">
-                                                            <div className="w-1.5 h-6 bg-blue-500 rounded-full" />
-                                                            {children}
-                                                        </h2>,
-                                                        code: ({ node, ...props }: any) => (
-                                                            <code className="bg-blue-500/5 dark:bg-white/5 px-2 py-1 rounded text-blue-600 dark:text-blue-400 text-sm font-mono" {...props} />
-                                                        ),
-                                                    }}
-                                                >
-                                                    {activeDocumentContent || "Neural Link Error: No context found in this memory sector."}
+                                            <div className="markdown-content prose dark:prose-invert prose-blue max-w-none text-gray-800 dark:text-gray-200 leading-relaxed font-medium">
+                                                <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+                                                    {activeDocumentContent}
                                                 </ReactMarkdown>
                                             </div>
-                                        )}
+                                            <div className="pt-20 pb-10 text-center">
+                                                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-gray-400">End of Verified Context</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="h-full flex flex-col items-center justify-center p-12 text-center space-y-4">
+                                        <div className="p-6 rounded-full bg-gray-50 dark:bg-white/5 text-gray-300">
+                                            <Layers size={48} />
+                                        </div>
+                                        <div className="max-w-xs space-y-2">
+                                            <h4 className="text-lg font-black tracking-tight">Resource Unloaded</h4>
+                                            <p className="text-xs text-gray-500 font-medium">This document reference does not contain direct viewable content or the link has expired.</p>
+                                        </div>
                                     </div>
                                 )}
                                 {/* Glass Overlay for smoothness */}
