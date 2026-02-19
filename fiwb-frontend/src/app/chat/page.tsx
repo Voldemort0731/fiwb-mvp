@@ -343,6 +343,7 @@ function ChatBody() {
     const initializedRef = useRef(false);
 
     const [thinkingStep, setThinkingStep] = useState<string | null>(null);
+    const [streamingActive, setStreamingActive] = useState(false);
     const [foundSources, setFoundSources] = useState<Source[]>([]);
 
     // --- NEW FEATURES STATE ---
@@ -433,6 +434,7 @@ function ChatBody() {
 
         setIsLoading(true);
         setThinkingStep("Initializing Neural Link...");
+        setStreamingActive(false);
         setFoundSources([]);
 
         try {
@@ -511,6 +513,7 @@ function ChatBody() {
                         // Regular token content — first real token clears the thinking card
                         if (!streamStarted) {
                             streamStarted = true;
+                            setStreamingActive(true);
                             setThinkingStep(null);
                             setMessages(prev => [...prev, {
                                 role: "assistant",
@@ -551,6 +554,7 @@ function ChatBody() {
         } finally {
             setIsLoading(false);
             setThinkingStep(null);
+            setStreamingActive(false);
         }
     };
 
@@ -712,7 +716,7 @@ function ChatBody() {
 
                     {/* Standalone Thinking indicator (Pre-stream phase) */}
                     <AnimatePresence>
-                        {thinkingStep && isLoading && !messages.some(m => m.role === 'assistant' && !m.isThinking && m.content) && (
+                        {thinkingStep && isLoading && !streamingActive && (
                             <motion.div
                                 initial={{ opacity: 0, y: 16 }}
                                 animate={{ opacity: 1, y: 0 }}
