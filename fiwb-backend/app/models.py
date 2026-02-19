@@ -93,6 +93,7 @@ class ChatMessage(Base):
     attachment = Column(Text, nullable=True) # Base64 or URL
     attachment_type = Column(String, nullable=True)
     file_name = Column(String, nullable=True)
+    sources = Column(Text, nullable=True) # JSON string of sources/citations
     created_at = Column(DateTime, default=datetime.utcnow)
 
     thread = relationship("ChatThread", back_populates="messages")

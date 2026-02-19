@@ -74,7 +74,8 @@ async def get_thread_messages(thread_id: str, user_email: str, db: Session = Dep
         "content": m.content,
         "file_name": m.file_name,
         "attachment_type": m.attachment_type,
-        "attachment": m.attachment
+        "attachment": m.attachment,
+        "sources": json.loads(m.sources) if m.sources else []
     } for m in messages]
 
 @router.delete("/threads/{thread_id}")
@@ -253,7 +254,7 @@ async def chat_stream(
                     yield f"data: {json.dumps({'token': token})}\n\n"
 
             # OFFLOAD DEEP PERSISTENCE
-            background_tasks.add_task(finalize_stream, thread_id, full_response, actual_email, message, short_term_history, q_type, input_tokens)
+            background_tasks.add_task(finalize_stream, thread_id, full_response, actual_email, message, short_term_history, q_type, input_tokens, final_sources)
             
         except Exception as e:
             logger.error(f"Critical System Stream Failure: {e}", exc_info=True)
@@ -261,12 +262,17 @@ async def chat_stream(
 
     return StreamingResponse(generate(), media_type="text/event-stream")
 
-async def finalize_stream(thread_id, response, email, query, history, q_type, in_tokens):
+async def finalize_stream(thread_id, response, email, query, history, q_type, in_tokens, sources=None):
     """Offload heavy DB and AI tasks to background to unblock the main thread."""
     db = SessionLocal()
     try:
         # 1. Persist AI Message
-        msg = ChatMessage(thread_id=thread_id, role="assistant", content=response)
+        msg = ChatMessage(
+            thread_id=thread_id, 
+            role="assistant", 
+            content=response,
+            sources=json.dumps(sources) if sources else None
+        )
         db.add(msg)
         db.commit()
         
