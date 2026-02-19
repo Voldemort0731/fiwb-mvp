@@ -16,6 +16,7 @@ interface Source {
     title: string;
     display: string;
     link?: string;
+    chunks?: string[];
 }
 
 function MessageContent({ content, sources = [] }: { content: string; sources?: Source[] }) {
@@ -156,7 +157,7 @@ function MessageContent({ content, sources = [] }: { content: string; sources?: 
                                     whileHover={{ y: -4, scale: 1.01 }}
                                     className="group/source relative h-full"
                                 >
-                                    <div className="h-full flex flex-col p-4 rounded-[24px] glass-dark border border-gray-200/50 dark:border-white/5 bg-white/70 dark:bg-black/60 hover:border-blue-500/40 hover:bg-blue-500/[0.02] transition-all duration-300 shadow-xl shadow-black/5">
+                                    <div className="h-full flex flex-col p-4 rounded-[24px] glass-dark border border-gray-200/50 dark:border-white/5 bg-white/70 dark:bg-black/60 hover:border-blue-500/40 hover:bg-blue-500/[0.02] transition-all duration-300 shadow-xl shadow-black/5 overflow-hidden">
                                         <div className="flex items-start justify-between mb-3">
                                             <div className="p-2 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg shadow-blue-500/20">
                                                 <FileText size={18} className="text-white" />
@@ -173,9 +174,26 @@ function MessageContent({ content, sources = [] }: { content: string; sources?: 
                                             )}
                                         </div>
 
-                                        <h4 className="text-[12px] font-black text-gray-900 dark:text-gray-100 line-clamp-2 mb-4 leading-tight group-hover/source:text-blue-600 dark:group-hover/source:text-blue-400 transition-colors">
+                                        <h4 className="text-[12px] font-black text-gray-900 dark:text-gray-100 line-clamp-2 mb-3 leading-tight group-hover/source:text-blue-600 dark:group-hover/source:text-blue-400 transition-colors">
                                             {displayTitle}
                                         </h4>
+
+                                        {/* Direct Excerpts (Chunks) */}
+                                        {matchedSource?.chunks && matchedSource.chunks.length > 0 && (
+                                            <details className="mb-4 group/chunks">
+                                                <summary className="text-[9px] font-black uppercase tracking-widest text-blue-500 cursor-pointer hover:text-blue-600 list-none flex items-center gap-2">
+                                                    <ChevronRight size={10} className="group-open/chunks:rotate-90 transition-transform" />
+                                                    Direct Excerpts ({matchedSource.chunks.length})
+                                                </summary>
+                                                <div className="mt-2 space-y-2 max-h-[150px] overflow-y-auto scrollbar-thin pr-2">
+                                                    {matchedSource.chunks.map((chunk, cidx) => (
+                                                        <div key={cidx} className="p-2 rounded-xl bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/5 text-[10px] text-gray-600 dark:text-gray-400 font-medium italic leading-relaxed">
+                                                            "{chunk.length > 300 ? chunk.substring(0, 300) + "..." : chunk}"
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </details>
+                                        )}
 
                                         <div className="mt-auto pt-3 border-t border-gray-100 dark:border-white/5 flex items-center justify-between">
                                             {link ? (

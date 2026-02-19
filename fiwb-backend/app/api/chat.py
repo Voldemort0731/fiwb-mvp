@@ -178,23 +178,30 @@ async def chat_stream(
             c_data = res_retrieval if not isinstance(res_retrieval, Exception) else {}
 
             # BROADCAST SOURCES (Dynamic)
-            sources = []
-            seen = set()
+            sources_map = {}
             prefixes = {"course_context": "📚 ", "assistant_knowledge": "📧 ", "chat_assets": "📎 ", "memories": "🧠 "}
+            
             for cat, prefix in prefixes.items():
                 for item in c_data.get(cat, []):
                     meta = item.get("metadata", {})
                     title = meta.get("title") or meta.get("file_name") or "Document"
-                    if title not in seen:
-                        seen.add(title)
-                        sources.append({
-                            "title": title, 
+                    content = item.get("content", "")
+                    
+                    if title not in sources_map:
+                        sources_map[title] = {
+                            "title": title,
                             "display": f"{prefix}{title}",
-                            "link": meta.get("source_link") or meta.get("url")
-                        })
+                            "link": meta.get("source_link") or meta.get("url"),
+                            "chunks": []
+                        }
+                    
+                    if content and content not in sources_map[title]["chunks"]:
+                        sources_map[title]["chunks"].append(content)
+            
+            sources = list(sources_map.values())[:15]
             
             if sources:
-                yield f"data: EVENT:SOURCES:{json.dumps(sources[:15])}\n\n"
+                yield f"data: EVENT:SOURCES:{json.dumps(sources)}\n\n"
             yield f"data: EVENT:THINKING:Synthesizing response...\n\n"
 
             # CONSTRUCT SYSTEM PROMPT
