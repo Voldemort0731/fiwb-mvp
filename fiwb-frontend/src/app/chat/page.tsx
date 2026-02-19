@@ -178,11 +178,19 @@ function MessageContent({ content, sources = [] }: { content: string; sources?: 
                                             )}
                                         </div>
 
-                                        <h4 className="text-[12px] font-black text-gray-900 dark:text-gray-100 line-clamp-2 mb-3 leading-tight group-hover/source:text-blue-600 dark:group-hover/source:text-blue-400 transition-colors">
-                                            {displayTitle}
-                                        </h4>
+                                        {link ? (
+                                            <a href={link} target="_blank" rel="noopener noreferrer" className="block group/title">
+                                                <h4 className="text-[12px] font-black text-gray-900 dark:text-gray-100 line-clamp-2 mb-3 leading-tight group-hover/title:text-blue-600 dark:group-hover/title:text-blue-400 transition-colors">
+                                                    {displayTitle}
+                                                </h4>
+                                            </a>
+                                        ) : (
+                                            <h4 className="text-[12px] font-black text-gray-900 dark:text-gray-100 line-clamp-2 mb-3 leading-tight transition-colors">
+                                                {displayTitle}
+                                            </h4>
+                                        )}
 
-                                        {snippet && !['enhanced_memory', 'assistant_knowledge', 'user_profile'].includes(matchedSource?.source_type || '') && (
+                                        {snippet && !link && !['enhanced_memory', 'assistant_knowledge', 'user_profile'].includes(matchedSource?.source_type || '') && (
                                             <div className="mb-4">
                                                 <button
                                                     onClick={() => setExpandedSnippet(expandedSnippet === idx ? null : idx)}
@@ -216,8 +224,8 @@ function MessageContent({ content, sources = [] }: { content: string; sources?: 
                                                     rel="noopener noreferrer"
                                                     className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-lg shadow-blue-600/20 active:scale-95"
                                                 >
-                                                    <RefreshCw size={10} className="group-hover/source:rotate-180 transition-transform duration-500" />
-                                                    Deep Research
+                                                    <BookOpen size={10} />
+                                                    View Original
                                                 </a>
                                             ) : (
                                                 <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-white/5 text-gray-500 rounded-xl text-[10px] font-black uppercase tracking-wider opacity-60">
