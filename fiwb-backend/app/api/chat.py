@@ -194,7 +194,7 @@ async def chat_stream(
                         sources_dict[full_title] = {
                             "title": full_title,
                             "display": f"{prefix}{full_title}",
-                            "link": meta.get("source_link") or meta.get("url"),
+                            "link": meta.get("source_link") or meta.get("url") or meta.get("link") or meta.get("webViewLink") or meta.get("webViewUrl"),
                             "snippets": [item.get("content", "")],
                             "source_type": meta.get("type", "document")
                         }

@@ -151,7 +151,17 @@ function MessageContent({ content, sources = [], onOpenDocument }: MessageConten
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
                         {allBaseSources.map((baseTitle, idx) => {
-                            const matchedSource = sources.find(s => s.title.toLowerCase() === baseTitle.toLowerCase());
+                            // Try exact match first
+                            let matchedSource = sources.find(s => s.title.toLowerCase() === baseTitle.toLowerCase());
+
+                            // If not found, try fuzzy match (prefix or containment)
+                            if (!matchedSource) {
+                                matchedSource = sources.find(s =>
+                                    s.title.toLowerCase().includes(baseTitle.toLowerCase()) ||
+                                    baseTitle.toLowerCase().includes(s.title.toLowerCase())
+                                );
+                            }
+
                             const citation = docCitations.find(d => d.baseTitle.toLowerCase() === baseTitle.toLowerCase());
                             const displayTitle = matchedSource?.display || baseTitle;
                             const link = matchedSource?.link;
