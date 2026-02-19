@@ -648,7 +648,9 @@ function ChatBody() {
                                 >
                                     <div className={clsx(
                                         "px-6 py-4 rounded-[1.5rem] shadow-2xl relative overflow-hidden transition-colors duration-500",
-                                        msg.role === "user" ? "bg-blue-600 text-white font-medium rounded-tr-none shadow-blue-900/20" : "glass-dark border border-gray-200 dark:border-white/5 rounded-tl-none font-medium text-gray-900 dark:text-gray-200 bg-white dark:bg-black/40 shadow-xl shadow-gray-200/50 dark:shadow-none"
+                                        msg.role === "user"
+                                            ? "bg-gradient-to-br from-indigo-600 via-blue-600 to-violet-700 text-white font-medium rounded-tr-none shadow-lg shadow-indigo-900/30 border border-white/10"
+                                            : "glass-dark border border-gray-200 dark:border-white/5 rounded-tl-none font-medium text-gray-900 dark:text-gray-200 bg-white dark:bg-black/40 shadow-xl shadow-gray-200/50 dark:shadow-none"
                                     )}>
                                         {msg.attachment && msg.attachment_type?.startsWith('image/') && (
                                             <div className="mb-4 -mx-2 -mt-2">
@@ -767,8 +769,8 @@ function ChatBody() {
                                         return (
                                             <div key={i} className="flex items-center gap-2">
                                                 <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all duration-500 ${isActive ? "bg-blue-500 text-white shadow-lg shadow-blue-500/30"
-                                                        : isDone ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                                                            : "bg-gray-100 dark:bg-white/5 text-gray-400"
+                                                    : isDone ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
+                                                        : "bg-gray-100 dark:bg-white/5 text-gray-400"
                                                     }`}>
                                                     {isDone ? <Check size={9} /> : isActive ? (
                                                         <motion.div
