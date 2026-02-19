@@ -117,24 +117,12 @@ Rules:
             all_chunks = []
             for doc in res.get('results', []):
                 doc_id = doc.get('documentId')
-                top_title = doc.get('title')
-                top_desc = doc.get('description')
-                top_url = doc.get('url')
-                
                 meta = doc.get('metadata', {})
                 for chunk in doc.get('chunks', []):
                     # Combine doc metadata, chunk metadata, and doc_id
                     chunk_meta = {**meta, **chunk.get('metadata', {})}
                     if doc_id:
                         chunk_meta['documentId'] = doc_id
-                    
-                    # Backfill from top-level if missing
-                    if top_title and not chunk_meta.get('title'):
-                        chunk_meta['title'] = top_title
-                    if top_desc and not chunk_meta.get('description'):
-                        chunk_meta['description'] = top_desc
-                    if top_url and not chunk_meta.get('source_link'):
-                        chunk_meta['source_link'] = top_url
                     
                     all_chunks.append({
                         "content": chunk.get('content', ''),

@@ -20,13 +20,7 @@ interface Source {
     source_type?: string;
 }
 
-interface MessageContentProps {
-    content: string;
-    sources?: Source[];
-    onOpenDocument?: (url: string, title: string) => void;
-}
-
-function MessageContent({ content, sources = [], onOpenDocument }: MessageContentProps) {
+function MessageContent({ content, sources = [] }: { content: string; sources?: Source[] }) {
     const [expandedSnippet, setExpandedSnippet] = useState<number | null>(null);
 
     // 1. Parse Personal Reasoning (Handle typos like PERNALIZED)
@@ -151,17 +145,7 @@ function MessageContent({ content, sources = [], onOpenDocument }: MessageConten
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4">
                         {allBaseSources.map((baseTitle, idx) => {
-                            // Try exact match first
-                            let matchedSource = sources.find(s => s.title.toLowerCase() === baseTitle.toLowerCase());
-
-                            // If not found, try fuzzy match (prefix or containment)
-                            if (!matchedSource) {
-                                matchedSource = sources.find(s =>
-                                    s.title.toLowerCase().includes(baseTitle.toLowerCase()) ||
-                                    baseTitle.toLowerCase().includes(s.title.toLowerCase())
-                                );
-                            }
-
+                            const matchedSource = sources.find(s => s.title.toLowerCase() === baseTitle.toLowerCase());
                             const citation = docCitations.find(d => d.baseTitle.toLowerCase() === baseTitle.toLowerCase());
                             const displayTitle = matchedSource?.display || baseTitle;
                             const link = matchedSource?.link;
@@ -195,17 +179,11 @@ function MessageContent({ content, sources = [], onOpenDocument }: MessageConten
                                         </div>
 
                                         {link ? (
-                                            <button
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    if (onOpenDocument) onOpenDocument(link, displayTitle);
-                                                }}
-                                                className="block group/title text-left w-full"
-                                            >
+                                            <a href={link} target="_blank" rel="noopener noreferrer" className="block group/title">
                                                 <h4 className="text-[12px] font-black text-gray-900 dark:text-gray-100 line-clamp-2 mb-3 leading-tight group-hover/title:text-blue-600 dark:group-hover/title:text-blue-400 transition-colors">
                                                     {displayTitle}
                                                 </h4>
-                                            </button>
+                                            </a>
                                         ) : (
                                             <h4 className="text-[12px] font-black text-gray-900 dark:text-gray-100 line-clamp-2 mb-3 leading-tight transition-colors">
                                                 {displayTitle}
@@ -215,24 +193,15 @@ function MessageContent({ content, sources = [], onOpenDocument }: MessageConten
 
                                         <div className="mt-auto pt-3 border-t border-gray-100 dark:border-white/5 flex items-center justify-between">
                                             {link ? (
-                                                <div className="flex items-center gap-2">
-                                                    <button
-                                                        onClick={() => onOpenDocument?.(link, displayTitle)}
-                                                        className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-lg shadow-blue-600/20 active:scale-95"
-                                                    >
-                                                        <Zap size={10} />
-                                                        Focus View
-                                                    </button>
-                                                    <a
-                                                        href={link}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg text-gray-400 hover:text-blue-500 transition-colors"
-                                                        title="Open in new tab"
-                                                    >
-                                                        <RefreshCw size={12} />
-                                                    </a>
-                                                </div>
+                                                <a
+                                                    href={link}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-lg shadow-blue-600/20 active:scale-95"
+                                                >
+                                                    <BookOpen size={10} />
+                                                    View Original
+                                                </a>
                                             ) : (
                                                 <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-white/5 text-gray-500 rounded-xl text-[10px] font-black uppercase tracking-wider opacity-60">
                                                     <Settings size={10} />
@@ -391,8 +360,6 @@ function ChatBody() {
     const [replyingTo, setReplyingTo] = useState<any>(null);
     const [selectionPopup, setSelectionPopup] = useState<{ x: number, y: number, text: string } | null>(null);
     const [copiedId, setCopiedId] = useState<string | null>(null);
-    const [activeDocumentUrl, setActiveDocumentUrl] = useState<string | null>(null);
-    const [activeDocumentTitle, setActiveDocumentTitle] = useState<string | null>(null);
 
     // Track if user has scrolled up
     const handleScroll = (e: any) => {
@@ -667,358 +634,293 @@ function ChatBody() {
                 threads={threads}
                 activeThreadId={activeThreadId}
                 onThreadSelect={handleThreadSelect}
-                onNewChat={() => { setActiveThreadId("new"); setMessages([]); setActiveDocumentUrl(null); }}
+                onNewChat={() => { setActiveThreadId("new"); setMessages([]); }}
                 onDeleteThread={handleDeleteThread}
             />
-            <div className="flex-1 flex overflow-hidden">
-                <main
-                    className={clsx(
-                        "flex-1 flex flex-col relative transition-all duration-500 ease-in-out",
-                        activeDocumentUrl ? "lg:flex-[0.4]" : "w-full",
-                        "bg-dot-pattern"
-                    )}
-                    onScroll={handleScroll}
-                >
-                    <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-600/5 rounded-full blur-[120px] pointer-events-none" />
-                    <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-purple-600/5 rounded-full blur-[120px] pointer-events-none" />
+            <main
+                className="flex-1 flex flex-col relative bg-dot-pattern"
+                onScroll={handleScroll}
+            >
+                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-600/5 rounded-full blur-[120px] pointer-events-none" />
+                <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-purple-600/5 rounded-full blur-[120px] pointer-events-none" />
 
-                    <header className="px-8 py-5 glass-dark border-b border-gray-200 dark:border-white/5 flex justify-between items-center relative z-20">
-                        <div className="flex items-center gap-4">
-                            <div className="w-11 h-11 glass-card rounded-2xl flex items-center justify-center border border-gray-200 dark:border-white/10 shadow-2xl">
-                                <Cpu size={22} className="text-blue-500 dark:text-blue-400" />
-                            </div>
-                            <div>
-                                <h2 className="text-lg font-black tracking-tight flex items-center gap-2">
-                                    Neural <span className="text-blue-600 dark:text-blue-500">Workspace</span>
-                                </h2>
-                                <p className="text-[9px] font-black uppercase tracking-widest text-gray-700 dark:text-gray-500">Session: {activeThreadId === 'new' ? 'Uninitialized' : activeThreadId.slice(0, 8)}</p>
-                            </div>
+                <header className="px-8 py-5 glass-dark border-b border-gray-200 dark:border-white/5 flex justify-between items-center relative z-20">
+                    <div className="flex items-center gap-4">
+                        <div className="w-11 h-11 glass-card rounded-2xl flex items-center justify-center border border-gray-200 dark:border-white/10 shadow-2xl">
+                            <Cpu size={22} className="text-blue-500 dark:text-blue-400" />
                         </div>
-                        <div className="flex items-center gap-3">
-                            <div className="px-3 py-1.5 glass rounded-full border border-blue-500/10 flex items-center gap-2">
-                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)] animate-pulse" />
-                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Global Synapse Active</span>
-                            </div>
+                        <div>
+                            <h2 className="text-lg font-black tracking-tight flex items-center gap-2">
+                                Neural <span className="text-blue-600 dark:text-blue-500">Workspace</span>
+                            </h2>
+                            <p className="text-[9px] font-black uppercase tracking-widest text-gray-700 dark:text-gray-500">Session: {activeThreadId === 'new' ? 'Uninitialized' : activeThreadId.slice(0, 8)}</p>
                         </div>
-                    </header>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <div className="px-3 py-1.5 glass rounded-full border border-blue-500/10 flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)] animate-pulse" />
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Global Synapse Active</span>
+                        </div>
+                    </div>
+                </header>
 
-                    <div className="flex-1 overflow-y-auto p-8 space-y-8 scrollbar-premium relative z-10 scroll-smooth" onMouseUp={handleSelection}>
-                        {messages.length === 0 ? (
-                            <div className="h-full flex flex-col items-center justify-center text-center space-y-8">
-                                <motion.div
-                                    initial={{ scale: 0.9, opacity: 0 }}
-                                    animate={{ scale: 1, opacity: 1 }}
-                                    className="w-24 h-24 glass-card rounded-3xl flex items-center justify-center border border-white/10 shadow-2xl animate-float"
-                                >
-                                    <Zap size={48} className="text-blue-500" />
-                                </motion.div>
-                                <div className="max-w-md space-y-3">
-                                    <h3 className="text-2xl font-black tracking-tight text-gray-900 dark:text-white">Neural Interface Ready</h3>
-                                    <p className="text-gray-800 dark:text-gray-500 font-semibold leading-relaxed">
-                                        Your personal AI Chatbot is online. Ask about course materials, upcoming labs, or synthesize a summary.
-                                    </p>
-                                </div>
-                                <div className="grid grid-cols-2 gap-3 max-w-lg">
-                                    {["Summarize Recent Labs", "Upcoming Assignments", "Analyze Course Materials", "Study Plan Generation"].map(q => (
-                                        <button
-                                            key={q}
-                                            onClick={() => setInput(q)}
-                                            className="px-5 py-2.5 glass-card border border-gray-200 dark:border-white/5 text-[10px] uppercase tracking-widest font-black text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-white hover:border-blue-500/30 transition-all hover:bg-gray-50 dark:hover:bg-white/5"
-                                        >
-                                            {q}
-                                        </button>
-                                    ))}
-                                </div>
+                <div className="flex-1 overflow-y-auto p-8 space-y-8 scrollbar-premium relative z-10 scroll-smooth" onMouseUp={handleSelection}>
+                    {messages.length === 0 ? (
+                        <div className="h-full flex flex-col items-center justify-center text-center space-y-8">
+                            <motion.div
+                                initial={{ scale: 0.9, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                className="w-24 h-24 glass-card rounded-3xl flex items-center justify-center border border-white/10 shadow-2xl animate-float"
+                            >
+                                <Zap size={48} className="text-blue-500" />
+                            </motion.div>
+                            <div className="max-w-md space-y-3">
+                                <h3 className="text-2xl font-black tracking-tight text-gray-900 dark:text-white">Neural Interface Ready</h3>
+                                <p className="text-gray-800 dark:text-gray-500 font-semibold leading-relaxed">
+                                    Your personal AI Chatbot is online. Ask about course materials, upcoming labs, or synthesize a summary.
+                                </p>
                             </div>
-                        ) : (
-                            <div className="space-y-8">
-                                {messages.map((msg, i) => (
-                                    <motion.div
-                                        initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={i}
-                                        className={clsx("flex flex-col max-w-[90%] lg:max-w-[80%] space-y-2 group/message", msg.role === "user" ? "ml-auto items-end" : "items-start")}
+                            <div className="grid grid-cols-2 gap-3 max-w-lg">
+                                {["Summarize Recent Labs", "Upcoming Assignments", "Analyze Course Materials", "Study Plan Generation"].map(q => (
+                                    <button
+                                        key={q}
+                                        onClick={() => setInput(q)}
+                                        className="px-5 py-2.5 glass-card border border-gray-200 dark:border-white/5 text-[10px] uppercase tracking-widest font-black text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-white hover:border-blue-500/30 transition-all hover:bg-gray-50 dark:hover:bg-white/5"
                                     >
-                                        <div className={clsx(
-                                            "px-6 py-4 rounded-[1.5rem] shadow-2xl relative overflow-hidden transition-colors duration-500",
-                                            msg.role === "user" ? "bg-blue-600 text-white font-medium rounded-tr-none shadow-blue-900/20" : "glass-dark border border-gray-200 dark:border-white/5 rounded-tl-none font-medium text-gray-900 dark:text-gray-200 bg-white dark:bg-black/40 shadow-xl shadow-gray-200/50 dark:shadow-none"
-                                        )}>
-                                            {msg.attachment && msg.attachment_type?.startsWith('image/') && (
-                                                <div className="mb-4 -mx-2 -mt-2">
-                                                    <img src={msg.attachment} alt="Attachment" className="rounded-xl w-full max-h-[400px] object-cover border border-white/10" />
-                                                </div>
-                                            )}
-                                            {msg.attachment && !msg.attachment_type?.startsWith('image/') && (
-                                                <div className="mb-4 bg-gray-100 dark:bg-white/10 p-3 rounded-xl flex items-center gap-3 border border-gray-200 dark:border-white/10">
-                                                    <div className="w-10 h-10 bg-gray-200 dark:bg-white/20 rounded-lg flex items-center justify-center">
-                                                        <FileText size={20} className="text-blue-600 dark:text-white" />
-                                                    </div>
-                                                    <div className="flex flex-col overflow-hidden">
-                                                        <span className="text-sm font-bold truncate text-gray-900 dark:text-white">{msg.file_name || "Attachment"}</span>
-                                                        <span className="text-[10px] opacity-70 uppercase tracking-widest text-gray-700 dark:text-gray-300">File Transferred</span>
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {msg.isThinking ? (
-                                                <div className="flex flex-col gap-4 py-2">
-                                                    <div className="flex items-center gap-3">
-                                                        <RefreshCw size={14} className="text-blue-500 animate-spin" />
-                                                        <span className="text-xs font-bold text-blue-500 animate-pulse">{msg.content || "Neural Synthesis Active..."}</span>
-                                                    </div>
-                                                    {msg.sources && msg.sources.length > 0 && (
-                                                        <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100 dark:border-white/5">
-                                                            {msg.sources.slice(0, 3).map((s: any, idx: number) => (
-                                                                <div key={idx} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-blue-500/5 border border-blue-500/10 text-[9px] font-bold text-blue-500/70">
-                                                                    <BookOpen size={9} />
-                                                                    <span className="truncate max-w-[100px]">{s.title}</span>
-                                                                </div>
-                                                            ))}
-                                                            {msg.sources.length > 3 && (
-                                                                <span className="text-[9px] font-bold text-gray-400 mt-1">+{msg.sources.length - 3} more sources</span>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ) : (
-                                                <MessageContent
-                                                    content={msg.content}
-                                                    sources={msg.sources}
-                                                    onOpenDocument={(url, title) => {
-                                                        setActiveDocumentUrl(url);
-                                                        setActiveDocumentTitle(title);
-                                                    }}
-                                                />
-                                            )}
-                                        </div>
-                                        <div className="flex items-center gap-2 px-2 opacity-0 group-hover/message:opacity-100 transition-opacity">
-                                            <span className="text-[9px] uppercase tracking-widest font-black text-gray-700 dark:text-gray-600 mr-2">
-                                                {msg.role === "user" ? "Authorized User" : "Neural Synthesizer"}
-                                            </span>
-
-                                            <button
-                                                onClick={() => handleCopy(msg.content)}
-                                                className="p-1 hover:bg-gray-100 dark:hover:bg-white/10 rounded text-gray-500 hover:text-blue-500 transition-colors"
-                                                title="Copy to clipboard"
-                                            >
-                                                {copiedId === msg.content ? <Check size={12} /> : <Copy size={12} />}
-                                            </button>
-
-                                            <button
-                                                onClick={() => setReplyingTo(msg)}
-                                                className="p-1 hover:bg-gray-100 dark:hover:bg-white/10 rounded text-gray-500 hover:text-blue-500 transition-colors"
-                                                title="Reply to message"
-                                            >
-                                                <Reply size={12} />
-                                            </button>
-                                        </div>
-                                    </motion.div>
+                                        {q}
+                                    </button>
                                 ))}
                             </div>
-                        )}
-
-                        {/* Standalone Thinking indicator (Pre-stream phase) */}
-                        <AnimatePresence>
-                            {thinkingStep && !messages.some(m => m.role === 'assistant' && (m.isThinking || m.content)) && (
+                        </div>
+                    ) : (
+                        <div className="space-y-8">
+                            {messages.map((msg, i) => (
                                 <motion.div
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, scale: 0.95 }}
-                                    className="flex flex-col items-start max-w-[90%] lg:max-w-[80%] space-y-4 mb-4 mt-8"
+                                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={i}
+                                    className={clsx("flex flex-col max-w-[90%] lg:max-w-[80%] space-y-2 group/message", msg.role === "user" ? "ml-auto items-end" : "items-start")}
                                 >
-                                    <div className="glass-dark border border-blue-500/20 rounded-[1.5rem] px-8 py-6 shadow-2xl bg-white dark:bg-black/40 relative overflow-hidden group">
-                                        <div className="absolute top-0 left-0 w-1 h-full bg-blue-500 animate-pulse" />
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
-                                                <RefreshCw size={18} className="text-blue-500 animate-spin" />
+                                    <div className={clsx(
+                                        "px-6 py-4 rounded-[1.5rem] shadow-2xl relative overflow-hidden transition-colors duration-500",
+                                        msg.role === "user" ? "bg-blue-600 text-white font-medium rounded-tr-none shadow-blue-900/20" : "glass-dark border border-gray-200 dark:border-white/5 rounded-tl-none font-medium text-gray-900 dark:text-gray-200 bg-white dark:bg-black/40 shadow-xl shadow-gray-200/50 dark:shadow-none"
+                                    )}>
+                                        {msg.attachment && msg.attachment_type?.startsWith('image/') && (
+                                            <div className="mb-4 -mx-2 -mt-2">
+                                                <img src={msg.attachment} alt="Attachment" className="rounded-xl w-full max-h-[400px] object-cover border border-white/10" />
                                             </div>
-                                            <div className="flex flex-col">
-                                                <span className="text-blue-500 font-black text-[10px] uppercase tracking-[0.2em] mb-1">Process Active</span>
-                                                <span className="text-gray-900 dark:text-white font-bold text-sm tracking-tight">{thinkingStep}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-
-                        <div ref={messagesEndRef} />
-
-                        {/* Selection Popup */}
-                        <AnimatePresence>
-                            {selectionPopup && (
-                                <motion.div
-                                    initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                                    exit={{ opacity: 0, scale: 0.9 }}
-                                    style={{
-                                        position: 'fixed',
-                                        left: selectionPopup.x,
-                                        top: selectionPopup.y,
-                                        zIndex: 9999,
-                                        pointerEvents: 'auto'
-                                    }}
-                                    className="flex gap-1 bg-white dark:bg-black rounded-full shadow-2xl p-1 border border-gray-200 dark:border-white/10"
-                                >
-                                    <button
-                                        onMouseDown={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            setInput(`Explain this: "${selectionPopup.text}"`);
-                                            setSelectionPopup(null);
-                                            setTimeout(() => fileInputRef.current?.focus(), 50);
-                                        }}
-                                        className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-full text-xs font-bold shadow-sm hover:bg-blue-500 transition-all whitespace-nowrap"
-                                    >
-                                        <Sparkles size={12} />
-                                        Ask AI
-                                    </button>
-                                    <div className="w-[1px] bg-gray-200 dark:bg-white/10 my-1" />
-                                    <button
-                                        onMouseDown={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            handleCopy(selectionPopup.text);
-                                            setSelectionPopup(null);
-                                        }}
-                                        className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-white/10 text-gray-700 dark:text-gray-200 rounded-full text-xs font-bold transition-all whitespace-nowrap"
-                                    >
-                                        <Copy size={12} />
-                                        Copy
-                                    </button>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </div>
-
-                    <footer className="p-8 relative z-20">
-                        <div className="max-w-6xl mx-auto space-y-4">
-                            <AnimatePresence>
-                                {replyingTo && (
-                                    <motion.div
-                                        initial={{ opacity: 0, y: 10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, y: 10 }}
-                                        className="flex items-center gap-3 p-3 glass-dark bg-white/50 dark:bg-black/40 border border-blue-500/20 rounded-2xl mb-2 backdrop-blur-md relative overflow-hidden"
-                                    >
-                                        <div className="w-1 h-8 bg-blue-500 rounded-full" />
-                                        <div className="flex-1 overflow-hidden">
-                                            <p className="text-[10px] font-black uppercase text-blue-500 tracking-widest mb-0.5">Replying to {replyingTo.role === 'user' ? 'Yourself' : 'Neural Synthesizer'}</p>
-                                            <p className="text-xs text-gray-600 dark:text-gray-300 truncate font-medium">{replyingTo.content}</p>
-                                        </div>
-                                        <button
-                                            onClick={() => setReplyingTo(null)}
-                                            className="p-1.5 hover:bg-red-500/10 text-gray-400 hover:text-red-500 rounded-lg transition-colors"
-                                        >
-                                            <X size={14} />
-                                        </button>
-                                    </motion.div>
-                                )}
-                                {selectedFile && (
-                                    <motion.div
-                                        initial={{ opacity: 0, y: 20, scale: 0.9 }}
-                                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                                        exit={{ opacity: 0, y: 20, scale: 0.9 }}
-                                        className="relative inline-block group"
-                                    >
-                                        {previewUrl ? (
-                                            <img src={previewUrl} alt="Preview" className="h-32 rounded-2xl border-2 border-blue-500 shadow-2xl" />
-                                        ) : (
-                                            <div className="h-20 px-6 bg-blue-900/20 rounded-2xl border border-blue-500/50 flex items-center gap-3 shadow-2xl backdrop-blur-md">
-                                                <FileText size={24} className="text-blue-400" />
-                                                <div className="flex flex-col">
-                                                    <span className="text-sm font-bold text-blue-100 max-w-[150px] truncate">{selectedFile.name}</span>
-                                                    <span className="text-[10px] text-blue-400/70 font-mono">{(selectedFile.size / 1024).toFixed(1)} KB</span>
+                                        )}
+                                        {msg.attachment && !msg.attachment_type?.startsWith('image/') && (
+                                            <div className="mb-4 bg-gray-100 dark:bg-white/10 p-3 rounded-xl flex items-center gap-3 border border-gray-200 dark:border-white/10">
+                                                <div className="w-10 h-10 bg-gray-200 dark:bg-white/20 rounded-lg flex items-center justify-center">
+                                                    <FileText size={20} className="text-blue-600 dark:text-white" />
+                                                </div>
+                                                <div className="flex flex-col overflow-hidden">
+                                                    <span className="text-sm font-bold truncate text-gray-900 dark:text-white">{msg.file_name || "Attachment"}</span>
+                                                    <span className="text-[10px] opacity-70 uppercase tracking-widest text-gray-700 dark:text-gray-300">File Transferred</span>
                                                 </div>
                                             </div>
                                         )}
-                                        <button onClick={removeFile} className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full shadow-xl transition-colors">
-                                            <X size={12} />
+
+                                        {msg.isThinking ? (
+                                            <div className="flex flex-col gap-4 py-2">
+                                                <div className="flex items-center gap-3">
+                                                    <RefreshCw size={14} className="text-blue-500 animate-spin" />
+                                                    <span className="text-xs font-bold text-blue-500 animate-pulse">{msg.content || "Neural Synthesis Active..."}</span>
+                                                </div>
+                                                {msg.sources && msg.sources.length > 0 && (
+                                                    <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100 dark:border-white/5">
+                                                        {msg.sources.slice(0, 3).map((s: any, idx: number) => (
+                                                            <div key={idx} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-blue-500/5 border border-blue-500/10 text-[9px] font-bold text-blue-500/70">
+                                                                <BookOpen size={9} />
+                                                                <span className="truncate max-w-[100px]">{s.title}</span>
+                                                            </div>
+                                                        ))}
+                                                        {msg.sources.length > 3 && (
+                                                            <span className="text-[9px] font-bold text-gray-400 mt-1">+{msg.sources.length - 3} more sources</span>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <MessageContent content={msg.content} sources={msg.sources} />
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-2 px-2 opacity-0 group-hover/message:opacity-100 transition-opacity">
+                                        <span className="text-[9px] uppercase tracking-widest font-black text-gray-700 dark:text-gray-600 mr-2">
+                                            {msg.role === "user" ? "Authorized User" : "Neural Synthesizer"}
+                                        </span>
+
+                                        <button
+                                            onClick={() => handleCopy(msg.content)}
+                                            className="p-1 hover:bg-gray-100 dark:hover:bg-white/10 rounded text-gray-500 hover:text-blue-500 transition-colors"
+                                            title="Copy to clipboard"
+                                        >
+                                            {copiedId === msg.content ? <Check size={12} /> : <Copy size={12} />}
                                         </button>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
 
-                            <div className="relative group">
-                                <div className="absolute inset-0 bg-blue-500/5 blur-3xl rounded-3xl opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none" />
-                                <div className="relative glass-dark border border-gray-200 dark:border-white/10 rounded-3xl p-3 flex items-center gap-3 shadow-2xl transition-all duration-500 focus-within:border-blue-500/40 bg-white dark:bg-black/40">
-                                    <button
-                                        onClick={() => fileInputRef.current?.click()}
-                                        className="w-12 h-12 flex items-center justify-center glass hover:bg-gray-100 dark:hover:bg-white/5 rounded-2xl text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 transition-all flex-shrink-0"
-                                    >
-                                        <Paperclip size={20} />
-                                    </button>
-                                    <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileSelect} />
-                                    <input
-                                        type="text" className="flex-1 bg-transparent border-none focus:outline-none text-gray-900 dark:text-white placeholder-gray-600 dark:placeholder-gray-600 font-bold py-3 text-sm px-2"
-                                        placeholder="Execute academic query..." value={input}
-                                        onChange={(e) => setInput(e.target.value)}
-                                        onKeyDown={(e) => e.key === "Enter" && !isLoading && sendMessage()}
-                                        onPaste={handlePaste}
-                                    />
-                                    <button
-                                        onClick={() => sendMessage()}
-                                        disabled={isLoading || (!input.trim() && !selectedFile)}
-                                        className="w-12 h-12 flex items-center justify-center bg-blue-600 text-white rounded-2xl hover:bg-blue-500 hover:scale-105 active:scale-95 transition-all disabled:opacity-20 flex-shrink-0 shadow-lg shadow-blue-600/20"
-                                    >
-                                        {isLoading ? <RefreshCw size={20} className="animate-spin" /> : <ChevronRight size={24} />}
-                                    </button>
-                                </div>
-                            </div>
-                            <p className="text-center text-[9px] uppercase tracking-[0.4em] font-black text-gray-700 dark:text-gray-600 opacity-60 transition-colors">GPT-4O NEURAL ARCHITECTURE • QUANTUM PERSISTENCE ENABLED</p>
+                                        <button
+                                            onClick={() => setReplyingTo(msg)}
+                                            className="p-1 hover:bg-gray-100 dark:hover:bg-white/10 rounded text-gray-500 hover:text-blue-500 transition-colors"
+                                            title="Reply to message"
+                                        >
+                                            <Reply size={12} />
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            ))}
                         </div>
-                    </footer>
-                </main>
-
-                <AnimatePresence>
-                    {activeDocumentUrl && (
-                        <motion.div
-                            initial={{ x: '100%', opacity: 0 }}
-                            animate={{ x: 0, opacity: 1 }}
-                            exit={{ x: '100%', opacity: 0 }}
-                            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                            className="w-full lg:flex-[0.6] border-l border-gray-200 dark:border-white/5 bg-white dark:bg-[#050505] flex flex-col relative z-40 shadow-[-20px_0_50px_rgba(0,0,0,0.2)]"
-                        >
-                            <div className="p-4 border-b border-gray-200 dark:border-white/5 flex justify-between items-center bg-gray-50 dark:bg-black/20 backdrop-blur-xl">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-500 shadow-lg shadow-blue-500/5">
-                                        <FileText size={18} />
-                                    </div>
-                                    <div className="flex flex-col">
-                                        <span className="text-[9px] font-black uppercase tracking-widest text-blue-500/70">Document Workspace</span>
-                                        <h3 className="text-sm font-black truncate max-w-[200px] sm:max-w-[400px]">{activeDocumentTitle}</h3>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <a
-                                        href={activeDocumentUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-500/5 rounded-xl transition-all"
-                                        title="Open in Full Window"
-                                    >
-                                        <RefreshCw size={20} />
-                                    </a>
-                                    <button
-                                        onClick={() => setActiveDocumentUrl(null)}
-                                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-500/5 rounded-xl transition-all"
-                                        title="Close Workspace"
-                                    >
-                                        <X size={24} />
-                                    </button>
-                                </div>
-                            </div>
-                            <div className="flex-1 w-full relative bg-white overflow-hidden">
-                                <iframe
-                                    src={activeDocumentUrl}
-                                    className="w-full h-full border-none"
-                                    title="Institutional Document Viewer"
-                                />
-                                {/* Glass Overlay for smoothness */}
-                                <div className="absolute inset-0 pointer-events-none border border-black/5 dark:border-white/5 rounded-none" />
-                            </div>
-                        </motion.div>
                     )}
-                </AnimatePresence>
-            </div>
+
+                    {/* Standalone Thinking indicator (Pre-stream phase) */}
+                    <AnimatePresence>
+                        {thinkingStep && !messages.some(m => m.role === 'assistant' && (m.isThinking || m.content)) && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                                className="flex flex-col items-start max-w-[90%] lg:max-w-[80%] space-y-4 mb-4 mt-8"
+                            >
+                                <div className="glass-dark border border-blue-500/20 rounded-[1.5rem] px-8 py-6 shadow-2xl bg-white dark:bg-black/40 relative overflow-hidden group">
+                                    <div className="absolute top-0 left-0 w-1 h-full bg-blue-500 animate-pulse" />
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center border border-blue-500/20">
+                                            <RefreshCw size={18} className="text-blue-500 animate-spin" />
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <span className="text-blue-500 font-black text-[10px] uppercase tracking-[0.2em] mb-1">Process Active</span>
+                                            <span className="text-gray-900 dark:text-white font-bold text-sm tracking-tight">{thinkingStep}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    <div ref={messagesEndRef} />
+
+                    {/* Selection Popup */}
+                    <AnimatePresence>
+                        {selectionPopup && (
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.9 }}
+                                style={{
+                                    position: 'fixed',
+                                    left: selectionPopup.x,
+                                    top: selectionPopup.y,
+                                    zIndex: 9999,
+                                    pointerEvents: 'auto'
+                                }}
+                                className="flex gap-1 bg-white dark:bg-black rounded-full shadow-2xl p-1 border border-gray-200 dark:border-white/10"
+                            >
+                                <button
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setInput(`Explain this: "${selectionPopup.text}"`);
+                                        setSelectionPopup(null);
+                                        setTimeout(() => fileInputRef.current?.focus(), 50);
+                                    }}
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-full text-xs font-bold shadow-sm hover:bg-blue-500 transition-all whitespace-nowrap"
+                                >
+                                    <Sparkles size={12} />
+                                    Ask AI
+                                </button>
+                                <div className="w-[1px] bg-gray-200 dark:bg-white/10 my-1" />
+                                <button
+                                    onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        handleCopy(selectionPopup.text);
+                                        setSelectionPopup(null);
+                                    }}
+                                    className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-white/10 text-gray-700 dark:text-gray-200 rounded-full text-xs font-bold transition-all whitespace-nowrap"
+                                >
+                                    <Copy size={12} />
+                                    Copy
+                                </button>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+
+                <footer className="p-8 relative z-20">
+                    <div className="max-w-6xl mx-auto space-y-4">
+                        <AnimatePresence>
+                            {replyingTo && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: 10 }}
+                                    className="flex items-center gap-3 p-3 glass-dark bg-white/50 dark:bg-black/40 border border-blue-500/20 rounded-2xl mb-2 backdrop-blur-md relative overflow-hidden"
+                                >
+                                    <div className="w-1 h-8 bg-blue-500 rounded-full" />
+                                    <div className="flex-1 overflow-hidden">
+                                        <p className="text-[10px] font-black uppercase text-blue-500 tracking-widest mb-0.5">Replying to {replyingTo.role === 'user' ? 'Yourself' : 'Neural Synthesizer'}</p>
+                                        <p className="text-xs text-gray-600 dark:text-gray-300 truncate font-medium">{replyingTo.content}</p>
+                                    </div>
+                                    <button
+                                        onClick={() => setReplyingTo(null)}
+                                        className="p-1.5 hover:bg-red-500/10 text-gray-400 hover:text-red-500 rounded-lg transition-colors"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </motion.div>
+                            )}
+                            {selectedFile && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 20, scale: 0.9 }}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    exit={{ opacity: 0, y: 20, scale: 0.9 }}
+                                    className="relative inline-block group"
+                                >
+                                    {previewUrl ? (
+                                        <img src={previewUrl} alt="Preview" className="h-32 rounded-2xl border-2 border-blue-500 shadow-2xl" />
+                                    ) : (
+                                        <div className="h-20 px-6 bg-blue-900/20 rounded-2xl border border-blue-500/50 flex items-center gap-3 shadow-2xl backdrop-blur-md">
+                                            <FileText size={24} className="text-blue-400" />
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-bold text-blue-100 max-w-[150px] truncate">{selectedFile.name}</span>
+                                                <span className="text-[10px] text-blue-400/70 font-mono">{(selectedFile.size / 1024).toFixed(1)} KB</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                    <button onClick={removeFile} className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full shadow-xl transition-colors">
+                                        <X size={12} />
+                                    </button>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+
+                        <div className="relative group">
+                            <div className="absolute inset-0 bg-blue-500/5 blur-3xl rounded-3xl opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none" />
+                            <div className="relative glass-dark border border-gray-200 dark:border-white/10 rounded-3xl p-3 flex items-center gap-3 shadow-2xl transition-all duration-500 focus-within:border-blue-500/40 bg-white dark:bg-black/40">
+                                <button
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="w-12 h-12 flex items-center justify-center glass hover:bg-gray-100 dark:hover:bg-white/5 rounded-2xl text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 transition-all flex-shrink-0"
+                                >
+                                    <Paperclip size={20} />
+                                </button>
+                                <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileSelect} />
+                                <input
+                                    type="text" className="flex-1 bg-transparent border-none focus:outline-none text-gray-900 dark:text-white placeholder-gray-600 dark:placeholder-gray-600 font-bold py-3 text-sm px-2"
+                                    placeholder="Execute academic query..." value={input}
+                                    onChange={(e) => setInput(e.target.value)}
+                                    onKeyDown={(e) => e.key === "Enter" && !isLoading && sendMessage()}
+                                    onPaste={handlePaste}
+                                />
+                                <button
+                                    onClick={() => sendMessage()}
+                                    disabled={isLoading || (!input.trim() && !selectedFile)}
+                                    className="w-12 h-12 flex items-center justify-center bg-blue-600 text-white rounded-2xl hover:bg-blue-500 hover:scale-105 active:scale-95 transition-all disabled:opacity-20 flex-shrink-0 shadow-lg shadow-blue-600/20"
+                                >
+                                    {isLoading ? <RefreshCw size={20} className="animate-spin" /> : <ChevronRight size={24} />}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </footer>
+            </main>
         </div>
     );
 }
