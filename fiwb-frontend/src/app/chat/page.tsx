@@ -649,7 +649,7 @@ function ChatBody() {
                                     <div className={clsx(
                                         "px-6 py-4 rounded-[1.5rem] shadow-2xl relative overflow-hidden transition-colors duration-500",
                                         msg.role === "user"
-                                            ? "bg-gradient-to-br from-indigo-600 via-blue-600 to-violet-700 text-white font-medium rounded-tr-none shadow-lg shadow-indigo-900/30 border border-white/10"
+                                            ? "bg-white/5 backdrop-blur-xl border border-white/10 text-white font-medium rounded-tr-none shadow-lg shadow-black/30"
                                             : "glass-dark border border-gray-200 dark:border-white/5 rounded-tl-none font-medium text-gray-900 dark:text-gray-200 bg-white dark:bg-black/40 shadow-xl shadow-gray-200/50 dark:shadow-none"
                                     )}>
                                         {msg.attachment && msg.attachment_type?.startsWith('image/') && (
