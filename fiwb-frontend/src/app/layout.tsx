@@ -19,6 +19,8 @@ export const metadata: Metadata = {
   description: "Institution-aware academic assistant",
   icons: {
     icon: "/fiwb-logo.svg",
+    shortcut: "/fiwb-logo.svg",
+    apple: "/fiwb-logo.svg",
   },
 };
 
