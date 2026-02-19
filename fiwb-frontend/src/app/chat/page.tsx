@@ -134,8 +134,8 @@ function MessageContent({ content, sources = [] }: { content: string; sources?: 
                                 <Layers size={14} className="text-blue-500" />
                             </div>
                             <div>
-                                <h5 className="text-[11px] font-black uppercase tracking-[0.25em] text-gray-500">Academic Integrity Report</h5>
-                                <p className="text-[9px] text-gray-400 font-medium">Verified sources retrieved from your Digital Twin's vault</p>
+                                <h5 className="text-[11px] font-black uppercase tracking-[0.25em] text-gray-500">Referred Docs</h5>
+                                <p className="text-[9px] text-gray-400 font-medium">Direct access to original materials</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-2 px-3 py-1 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-full shadow-sm">
