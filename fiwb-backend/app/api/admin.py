@@ -108,3 +108,101 @@ def get_sync_status(user_email: str, db: Session = Depends(get_db)):
         "has_token": bool(user.access_token),
         "has_refresh_token": bool(user.refresh_token)
     }
+
+async def _resync_announcement_drives_for_user(user_email: str):
+    """
+    Re-fetches every Google Classroom announcement for a user and runs
+    _index_announcement_drive_files on each one. This picks up Drive files
+    that were missed before the feature was added.
+    Safe to run multiple times — source_ids are deterministic, so Supermemory
+    will overwrite duplicates instead of creating new entries.
+    """
+    db = SessionLocal()
+    try:
+        user = db.query(User).filter(User.email == user_email).first()
+        if not user or not user.access_token:
+            logger.warning(f"[ResyncDrives] Skipping {user_email} — no token")
+            return
+        access_token  = user.access_token
+        refresh_token = user.refresh_token
+        courses       = [c for c in user.courses if c.platform == "Google Classroom"]
+    finally:
+        db.close()
+
+    if not courses:
+        logger.info(f"[ResyncDrives] No GC courses for {user_email}")
+        return
+
+    from app.lms.google_classroom import GoogleClassroomClient
+    from app.lms.sync_service import LMSSyncService
+
+    gc  = GoogleClassroomClient(access_token, refresh_token)
+    svc = LMSSyncService(access_token, user_email, refresh_token)
+
+    total_indexed = 0
+    for course in courses:
+        try:
+            announcements = await asyncio.wait_for(
+                gc.get_announcements(course.id), timeout=20.0
+            )
+        except Exception as e:
+            logger.warning(f"[ResyncDrives] Could not fetch announcements for {course.name}: {e}")
+            continue
+
+        for ann in announcements:
+            ann_id       = ann.get('id', '')
+            ann_text     = ann.get('text', '')
+            ann_materials = ann.get('materials', [])
+
+            if not ann_id:
+                continue
+
+            # Only process announcements that have drive files OR text Drive URLs
+            has_drive_attachments = any('driveFile' in m or 'link' in m for m in ann_materials)
+            has_drive_urls_in_text = (
+                'docs.google.com/' in ann_text or
+                'drive.google.com/' in ann_text
+            )
+
+            if not has_drive_attachments and not has_drive_urls_in_text:
+                continue
+
+            try:
+                await svc._index_announcement_drive_files(
+                    ann_materials, ann_id, ann_text,
+                    course.id, course.name, course.professor or 'Professor'
+                )
+                total_indexed += 1
+                await asyncio.sleep(0.3)   # gentle throttle
+            except Exception as e:
+                logger.warning(f"[ResyncDrives] Failed ann {ann_id} in {course.name}: {e}")
+
+    logger.info(f"[ResyncDrives] Done for {user_email} — processed {total_indexed} announcements with Drive content")
+
+
+@router.post("/resync-announcement-drives")
+async def resync_announcement_drives(
+    background_tasks: BackgroundTasks,
+    admin_email: str,
+    target_email: str = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Retroactively index Drive files attached to (or linked from) announcements.
+    Pass target_email to process one user, or omit to process ALL users.
+    """
+    verify_admin(admin_email)
+
+    if target_email:
+        email = standardize_email(target_email)
+        user  = db.query(User).filter(User.email == email).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        background_tasks.add_task(_resync_announcement_drives_for_user, email)
+        return {"status": "started", "users": [email]}
+
+    # All users
+    users = db.query(User).filter(User.access_token.isnot(None)).all()
+    for u in users:
+        background_tasks.add_task(_resync_announcement_drives_for_user, u.email)
+    return {"status": "started", "users": [u.email for u in users]}
