@@ -17,6 +17,10 @@ export default function SettingsPage() {
     useEffect(() => {
         if (typeof window !== "undefined") {
             const email = localStorage.getItem("user_email") || "";
+            if (!email) {
+                window.location.href = "/";
+                return;
+            }
             const name = localStorage.getItem("user_name") || "";
             const picture = localStorage.getItem("user_picture") || "";
             setUser({ email, name, picture });

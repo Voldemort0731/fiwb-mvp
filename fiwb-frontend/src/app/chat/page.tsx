@@ -269,6 +269,11 @@ function ChatBody() {
     };
 
     useEffect(() => {
+        const email = localStorage.getItem("user_email");
+        if (!email) {
+            window.location.href = "/";
+            return;
+        }
         fetchThreads(true);
     }, []);
 

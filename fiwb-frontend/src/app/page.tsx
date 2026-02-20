@@ -2,7 +2,7 @@
 import { useGoogleLogin } from "@react-oauth/google";
 import { useRouter } from "next/navigation";
 import { Zap, ShieldCheck, Cpu, BookOpen } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { API_URL } from "@/utils/config";
 
@@ -10,6 +10,14 @@ export default function Home() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    // Check if user is already logged in
+    const userEmail = localStorage.getItem("user_email");
+    if (userEmail) {
+      router.replace("/dashboard");
+    }
+  }, [router]);
 
   const login = useGoogleLogin({
     flow: 'auth-code',
