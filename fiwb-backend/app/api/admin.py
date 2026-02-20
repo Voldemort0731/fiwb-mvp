@@ -133,6 +133,9 @@ def get_sync_status(user_email: str, db: Session = Depends(get_db)):
         "last_synced": user.last_synced,
         "courses": course_count,
         "materials": material_count,
+        "supermemory_docs": user.supermemory_docs_indexed,
+        "api_requests": user.lms_api_requests_count,
+        "estimated_cost": user.estimated_cost_usd,
         "has_token": bool(user.access_token),
         "has_refresh_token": bool(user.refresh_token)
     }
