@@ -21,7 +21,7 @@ class LMSSyncService:
         self.access_token = access_token
         self.refresh_token = refresh_token
 
-    async def sync_all_courses(self):
+    async def sync_all_courses(self, force_reindex: bool = False):
         """
         PHASE 1 (Fast, ~2s): Fetch course list, update DB, return.
         PHASE 2 (Background): Deep content sync, fire-and-forget.
@@ -144,7 +144,7 @@ class LMSSyncService:
                         except Exception:
                             pass
 
-                        await self._sync_course_content(task_db, cid, cname, professor, user_id)
+                        await self._sync_course_content(task_db, cid, cname, professor, user_id, force_reindex=force_reindex)
 
                     except Exception as e:
                         logger.error(f"[Sync] Phase 2 error [{course_data.get('name')}]: {e}")
@@ -159,7 +159,7 @@ class LMSSyncService:
 
         asyncio.create_task(deep_sync())
 
-    async def _sync_course_content(self, db, course_id: str, course_name: str, professor: str, user_id: int):
+    async def _sync_course_content(self, db, course_id: str, course_name: str, professor: str, user_id: int, force_reindex: bool = False):
         """Sync all content for a single course. Uses local DB for dedup (no Supermemory round-trip)."""
         try:
             # Fast local dedup — one SQL query, no network call
@@ -175,16 +175,19 @@ class LMSSyncService:
 
             try:
                 coursework = await self.gc_client.get_coursework(course_id)
+                UsageTracker.log_lms_request(self.user_email)
             except Exception as e:
                 logger.warning(f"[Sync] Coursework fetch failed for {course_id}: {e}")
 
             try:
                 materials_list = await self.gc_client.get_materials(course_id)
+                UsageTracker.log_lms_request(self.user_email)
             except Exception as e:
                 logger.warning(f"[Sync] Materials fetch failed for {course_id}: {e}")
 
             try:
-                announcements = await self.gc_client.get_announcements(course_id)
+                announcements = await asyncio.wait_for(self.gc_client.get_announcements(course_id), timeout=15.0)
+                UsageTracker.log_lms_request(self.user_email)
             except Exception as e:
                 logger.warning(f"[Sync] Announcements fetch failed for {course_id}: {e}")
 
@@ -193,102 +196,46 @@ class LMSSyncService:
             # --- Assignments ---
             for work in coursework:
                 item_id = work.get('id')
-                if not item_id or item_id in existing_local_ids:
-                    continue
-                title = work.get('title', 'Assignment')
-                desc = work.get('description', '')[:1000]
-                due = self._format_date(work.get('dueDate'))
-                content, attachments = self._format_rich_item(work, due, "Assignment")
-
-                new_materials.append(Material(
-                    id=item_id,
-                    user_id=user_id,
-                    course_id=course_id,
-                    title=title,
-                    content=desc,
-                    type="assignment",
-                    due_date=due,
-                    created_at=work.get('creationTime'),
-                    attachments=json.dumps(attachments),
-                    source_link=work.get('alternateLink')
-                ))
-                existing_local_ids.add(item_id)
-
                 # Index to Supermemory in background (never blocks sync)
-                asyncio.create_task(self._index_item(
-                    content, title, desc, item_id, course_id, course_name, professor, "assignment", work.get('alternateLink')
-                ))
+                if force_reindex or item_id not in existing_local_ids:
+                    asyncio.create_task(self._index_item(
+                        content, title, desc, item_id, course_id, course_name, professor, "assignment", work.get('alternateLink')
+                    ))
+
+                if item_id in existing_local_ids:
+                    continue
+
 
             # --- Materials ---
             for mat in materials_list:
                 item_id = mat.get('id')
-                if not item_id or item_id in existing_local_ids:
+                if force_reindex or item_id not in existing_local_ids:
+                    asyncio.create_task(self._index_item(
+                        content, title, desc, item_id, course_id, course_name, professor, "material", mat.get('alternateLink')
+                    ))
+
+                if item_id in existing_local_ids:
                     continue
-                title = mat.get('title', 'Material')
-                desc = mat.get('description', '')[:1000]
-                content, attachments = self._format_rich_item(mat, None, "Course Material")
 
-                new_materials.append(Material(
-                    id=item_id,
-                    user_id=user_id,
-                    course_id=course_id,
-                    title=title,
-                    content=desc,
-                    type="material",
-                    due_date=None,
-                    created_at=mat.get('creationTime'),
-                    attachments=json.dumps(attachments),
-                    source_link=mat.get('alternateLink')
-                ))
-                existing_local_ids.add(item_id)
-
-                asyncio.create_task(self._index_item(
-                    content, title, desc, item_id, course_id, course_name, professor, "material", mat.get('alternateLink')
-                ))
 
             # --- Announcements ---
             for ann in announcements:
                 item_id = ann.get('id')
-                if not item_id or item_id in existing_local_ids:
-                    continue
-                text = ann.get('text', '')
-                if not text:
-                    continue
-                title = f"Announcement: {course_name}"
-                desc = text[:1000]
-                ann_materials = ann.get('materials', [])
-
-                # Build rich content including any file/link attachments
-                content = f"Announcement from {professor} in {course_name}:\n{text}"
-                attachments = []
-                if ann_materials:
-                    mat_text, attachments = self._format_materials(ann_materials)
-                    content += f"\nAttached Materials:\n{mat_text}"
-
-                new_materials.append(Material(
-                    id=item_id,
-                    user_id=user_id,
-                    course_id=course_id,
-                    title=title,
-                    content=desc,
-                    type="announcement",
-                    due_date=None,
-                    created_at=ann.get('creationTime'),
-                    attachments=json.dumps(attachments),
-                    source_link=ann.get('alternateLink')
-                ))
-                existing_local_ids.add(item_id)
-
                 # Index the announcement text itself
-                asyncio.create_task(self._index_item(
-                    content, title, desc, item_id, course_id, course_name, professor, "announcement", ann.get('alternateLink')
-                ))
-
-                # Index every Drive file attached to this announcement
-                if ann_materials:
-                    asyncio.create_task(self._index_announcement_drive_files(
-                        ann_materials, item_id, text, course_id, course_name, professor
+                if force_reindex or item_id not in existing_local_ids:
+                    asyncio.create_task(self._index_item(
+                        content, title, desc, item_id, course_id, course_name, professor, "announcement", ann.get('alternateLink')
                     ))
+
+                    # Index every Drive file attached to this announcement
+                    if ann_materials:
+                        asyncio.create_task(self._index_announcement_drive_files(
+                            ann_materials, item_id, text, course_id, course_name, professor
+                        ))
+
+                if item_id in existing_local_ids:
+                    continue
+
 
             # Bulk insert all new items in one transaction
             if new_materials:
@@ -321,6 +268,7 @@ class LMSSyncService:
                 "source_link": source_link
             }
             await self.sm_client.add_document(content, metadata, title=title, description=desc[:200])
+            UsageTracker.log_index_event(self.user_email, content)
         except Exception as e:
             logger.warning(f"[Sync] Supermemory index failed for {item_id}: {e}")
 
@@ -451,6 +399,7 @@ class LMSSyncService:
                     title=f"[{course_name}] {file_title}",
                     description="Drive file from professor announcement"
                 )
+                UsageTracker.log_index_event(self.user_email, full_content)
                 logger.info(f"[Sync] Indexed Drive file '{file_title}' from announcement {ann_id} ({course_name})")
 
             except Exception as e:

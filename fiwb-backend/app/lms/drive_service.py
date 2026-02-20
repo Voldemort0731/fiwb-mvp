@@ -11,6 +11,7 @@ import json
 import asyncio
 
 from app.utils.locks import GLOBAL_API_LOCK
+from app.intelligence.usage import UsageTracker
 
 class DriveSyncService:
     def __init__(self, access_token: str, user_email: str, refresh_token: str = None):
@@ -51,6 +52,7 @@ class DriveSyncService:
                     pageSize=50
                 ).execute()
             )
+        UsageTracker.log_lms_request(self.user_email)
         return results.get('files', [])
 
     async def sync_folder(self, folder_id: str):
@@ -130,6 +132,7 @@ class DriveSyncService:
                             description=f"File from Google Drive",
                             metadata={"user_id": self.user_email, "source": "google_drive", "file_id": file_id}
                         )
+                        UsageTracker.log_index_event(self.user_email, content)
                         synced_count += 1
                     finally:
                         write_db.close()
@@ -193,6 +196,7 @@ class DriveSyncService:
                     else:
                         all_files.append(item)
                 page_token = results.get('nextPageToken')
+                UsageTracker.log_lms_request(self.user_email)
                 if not page_token: break
             await asyncio.sleep(0.1)
         return all_files
