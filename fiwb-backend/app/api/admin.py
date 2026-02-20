@@ -62,16 +62,44 @@ async def _run_full_sync(user_email: str):
 
 @router.post("/sync/{user_email}")
 async def trigger_sync(user_email: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
-    """Manually trigger a full sync for a user using their stored token."""
+    """Manually trigger a full sync (Classroom + Gmail) for a specific user."""
     email = standardize_email(user_email)
     user = db.query(User).filter(User.email == email).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     if not user.access_token:
-        raise HTTPException(status_code=400, detail="No access token stored for user. Please log in again.")
+        raise HTTPException(status_code=400, detail="No access token stored for user.")
 
     background_tasks.add_task(_run_full_sync, email)
     return {"status": "sync_started", "user": email}
+
+@router.post("/resync-all-data")
+async def resync_all_data(
+    background_tasks: BackgroundTasks,
+    admin_email: str,
+    target_email: str = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Triggers a full re-sync (Google Classroom + Gmail) for users.
+    Pass target_email to sync one user, or omit to sync ALL users.
+    """
+    verify_admin(admin_email)
+
+    if target_email:
+        email = standardize_email(target_email)
+        user = db.query(User).filter(User.email == email).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        background_tasks.add_task(_run_full_sync, email)
+        return {"status": "started", "users": [email]}
+
+    # All users with tokens
+    users = db.query(User).filter(User.access_token.isnot(None)).all()
+    for u in users:
+        background_tasks.add_task(_run_full_sync, u.email)
+    
+    return {"status": "started", "users": [u.email for u in users]}
 
 @router.post("/cleanup/{user_email}")
 async def cleanup_user_data(user_email: str, db: Session = Depends(get_db)):
