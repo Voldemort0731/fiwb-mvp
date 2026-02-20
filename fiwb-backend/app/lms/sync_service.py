@@ -96,6 +96,9 @@ class LMSSyncService:
                 db.commit()
             else:
                 logger.warning("[Sync] Google returned 0 courses. Skipping cleanup to prevent accidental data wipe.")
+            
+            user.last_synced = datetime.utcnow()
+            db.commit()
             logger.info(f"[Sync] Phase 1 DONE for {self.user_email} — {len(courses_data)} courses in DB")
 
         except Exception as e:
