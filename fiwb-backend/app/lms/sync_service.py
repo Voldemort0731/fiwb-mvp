@@ -329,55 +329,119 @@ class LMSSyncService:
         course_id: str, course_name: str, professor: str
     ):
         """
-        For every Drive file attached to an announcement, download its content
-        and index it into Supermemory so the AI can answer questions about it.
+        Finds and indexes ALL Drive files referenced by an announcement:
+          1. Proper driveFile attachments (pinned from Google Drive)
+          2. Link-type attachments whose URL is a Google Drive/Docs URL
+          3. Raw Google Drive / Docs URLs pasted directly in the announcement text
+        Each file is downloaded, extracted (PDF/Docs/Sheets/etc.), and indexed
+        into Supermemory with full course + professor context.
         """
+        import re
         from app.lms.drive_service import DriveSyncService
+        from app.utils.locks import GLOBAL_API_LOCK
 
         drive_svc = DriveSyncService(self.access_token, self.user_email, self.refresh_token)
 
+        # Collect {file_id: {title, link, mime}} — dict deduplicates across all sources
+        files_to_process = {}
+
+        # ── SOURCE 1: Proper driveFile attachments ───────────────────────────────
         for mat in materials:
-            if 'driveFile' not in mat:
-                continue  # Skip YouTube/links/forms — only Drive files have parseable content
+            if 'driveFile' in mat:
+                df = mat['driveFile'].get('driveFile', {})
+                fid = df.get('id', '')
+                if fid and fid not in files_to_process:
+                    files_to_process[fid] = {
+                        'title': df.get('title', 'Drive File'),
+                        'link':  df.get('alternateLink', ''),
+                        'mime':  df.get('mimeType', ''),
+                    }
 
-            df = mat['driveFile'].get('driveFile', {})
-            file_id = df.get('id', '')
-            file_title = df.get('title', 'Drive File')
-            file_link = df.get('alternateLink', '')
-            mime = df.get('mimeType', '')
+            # ── SOURCE 2: Link-type attachment with a Google Drive/Docs URL ──────
+            elif 'link' in mat:
+                url = mat['link'].get('url', '')
+                fid, mime = self._extract_drive_file_id_and_mime(url)
+                if fid and fid not in files_to_process:
+                    files_to_process[fid] = {
+                        'title': mat['link'].get('title', 'Drive File'),
+                        'link':  url,
+                        'mime':  mime,   # may be empty — resolved via API below
+                    }
 
-            if not file_id:
-                continue
+        # ── SOURCE 3: Raw Drive URLs pasted directly in the announcement text ────
+        drive_url_re = re.compile(
+            r'https://(?:'
+            r'docs\.google\.com/(?:document|spreadsheets|presentation|forms)/d/'
+            r'|drive\.google\.com/(?:file/d/|open\?id=)'
+            r')([a-zA-Z0-9_-]+)',
+            re.IGNORECASE
+        )
+        for m in drive_url_re.finditer(ann_text):
+            full_url = m.group(0)
+            fid, mime = self._extract_drive_file_id_and_mime(full_url)
+            if fid and fid not in files_to_process:
+                files_to_process[fid] = {
+                    'title': 'Drive File from Announcement',
+                    'link':  full_url,
+                    'mime':  mime,
+                }
 
+        if not files_to_process:
+            return
+
+        # ── Process each unique file ──────────────────────────────────────────────
+        for file_id, info in files_to_process.items():
+            file_title = info['title']
+            file_link  = info['link']
+            mime       = info['mime']
             try:
+                # If MIME is unknown, resolve it via Drive API
+                if not mime:
+                    try:
+                        service = await drive_svc._get_service()
+                        async with GLOBAL_API_LOCK:
+                            meta = await asyncio.to_thread(
+                                lambda: service.files().get(
+                                    fileId=file_id,
+                                    fields='id,name,mimeType,webViewLink'
+                                ).execute()
+                            )
+                        mime = meta.get('mimeType', '')
+                        if file_title in ('Drive File from Announcement', 'Drive File'):
+                            file_title = meta.get('name', file_title)
+                        if not file_link:
+                            file_link = meta.get('webViewLink', '')
+                    except Exception as e:
+                        logger.warning(f"[Sync] Could not resolve Drive metadata for {file_id}: {e}")
+                        continue   # Skip file if we can't even determine its type
+
                 file_meta = {'id': file_id, 'mimeType': mime, 'name': file_title}
                 extracted = await drive_svc._get_file_content(file_meta)
 
                 if extracted and len(extracted.strip()) >= 50:
-                    # Rich content — prepend announcement context so retrieval is meaningful
                     full_content = (
-                        f"Course Material (Drive Attachment) shared by {professor} in {course_name}\n"
+                        f"Course Material (Drive File) shared by {professor} in {course_name}\n"
                         f"From Announcement: {ann_text[:400]}\n\n"
                         f"--- File: {file_title} ---\n{extracted}"
                     )
                 else:
-                    # File had no extractable text (e.g. image); still index the metadata
+                    # Unextractable (image, empty) — index metadata so AI knows it exists
                     full_content = (
-                        f"Drive file '{file_title}' attached to an announcement by {professor} in {course_name}.\n"
+                        f"Drive file '{file_title}' shared by {professor} in {course_name}.\n"
                         f"Announcement: {ann_text[:600]}"
                     )
 
                 metadata = {
-                    "user_id": self.user_email,
-                    "course_id": course_id,
-                    "course_name": course_name,
-                    "professor": professor,
-                    "type": "announcement_drive_attachment",
-                    "source_id": f"ann_{ann_id}_drive_{file_id}",
-                    "source": "google_classroom",
-                    "source_link": file_link,
-                    "file_title": file_title,
-                    "mime_type": mime,
+                    "user_id":                self.user_email,
+                    "course_id":              course_id,
+                    "course_name":            course_name,
+                    "professor":              professor,
+                    "type":                   "announcement_drive_attachment",
+                    "source_id":              f"ann_{ann_id}_drive_{file_id}",
+                    "source":                 "google_classroom",
+                    "source_link":            file_link,
+                    "file_title":             file_title,
+                    "mime_type":              mime,
                     "parent_announcement_id": ann_id,
                 }
 
@@ -385,12 +449,44 @@ class LMSSyncService:
                     content=full_content,
                     metadata=metadata,
                     title=f"[{course_name}] {file_title}",
-                    description=f"Drive attachment from professor announcement"
+                    description="Drive file from professor announcement"
                 )
-                logger.info(f"[Sync] Indexed Drive attachment '{file_title}' from announcement {ann_id} ({course_name})")
+                logger.info(f"[Sync] Indexed Drive file '{file_title}' from announcement {ann_id} ({course_name})")
 
             except Exception as e:
-                logger.warning(f"[Sync] Failed to index Drive attachment '{file_title}' (ann={ann_id}): {e}")
+                logger.warning(f"[Sync] Failed to index Drive file '{file_title}' (ann={ann_id}): {e}")
+
+    def _extract_drive_file_id_and_mime(self, url: str) -> tuple:
+        """
+        Parse a Google Drive / Docs URL and return (file_id, mime_type).
+        mime_type is empty for drive.google.com/file URLs — caller must resolve via API.
+        """
+        import re
+        MIME_MAP = {
+            'document':     'application/vnd.google-apps.document',
+            'spreadsheets': 'application/vnd.google-apps.spreadsheet',
+            'presentation': 'application/vnd.google-apps.presentation',
+            'forms':        'application/vnd.google-apps.form',
+        }
+        # docs.google.com/{type}/d/{id}
+        m = re.search(
+            r'docs\.google\.com/(document|spreadsheets|presentation|forms)/d/([a-zA-Z0-9_-]+)',
+            url, re.IGNORECASE
+        )
+        if m:
+            return m.group(2), MIME_MAP.get(m.group(1), '')
+
+        # drive.google.com/file/d/{id}
+        m = re.search(r'drive\.google\.com/file/d/([a-zA-Z0-9_-]+)', url, re.IGNORECASE)
+        if m:
+            return m.group(1), ''   # MIME unknown
+
+        # drive.google.com/open?id={id}
+        m = re.search(r'drive\.google\.com/open\?id=([a-zA-Z0-9_-]+)', url, re.IGNORECASE)
+        if m:
+            return m.group(1), ''   # MIME unknown
+
+        return '', ''
 
     def _format_date(self, date_dict: dict) -> str:
         if not date_dict:
