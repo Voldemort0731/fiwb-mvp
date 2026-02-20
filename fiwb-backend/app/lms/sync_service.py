@@ -196,6 +196,13 @@ class LMSSyncService:
             # --- Assignments ---
             for work in coursework:
                 item_id = work.get('id')
+                if not item_id: continue
+                
+                title = work.get('title', 'Assignment')
+                desc = work.get('description', '')[:1000]
+                due = self._format_date(work.get('dueDate'))
+                content, attachments = self._format_rich_item(work, due, "Assignment")
+
                 # Index to Supermemory in background (never blocks sync)
                 if force_reindex or item_id not in existing_local_ids:
                     asyncio.create_task(self._index_item(
@@ -205,10 +212,29 @@ class LMSSyncService:
                 if item_id in existing_local_ids:
                     continue
 
+                new_materials.append(Material(
+                    id=item_id,
+                    user_id=user_id,
+                    course_id=course_id,
+                    title=title,
+                    content=desc,
+                    type="assignment",
+                    due_date=due,
+                    created_at=work.get('creationTime'),
+                    attachments=json.dumps(attachments),
+                    source_link=work.get('alternateLink')
+                ))
+                existing_local_ids.add(item_id)
 
             # --- Materials ---
             for mat in materials_list:
                 item_id = mat.get('id')
+                if not item_id: continue
+                
+                title = mat.get('title', 'Material')
+                desc = mat.get('description', '')[:1000]
+                content, attachments = self._format_rich_item(mat, None, "Course Material")
+
                 if force_reindex or item_id not in existing_local_ids:
                     asyncio.create_task(self._index_item(
                         content, title, desc, item_id, course_id, course_name, professor, "material", mat.get('alternateLink')
@@ -217,10 +243,39 @@ class LMSSyncService:
                 if item_id in existing_local_ids:
                     continue
 
+                new_materials.append(Material(
+                    id=item_id,
+                    user_id=user_id,
+                    course_id=course_id,
+                    title=title,
+                    content=desc,
+                    type="material",
+                    due_date=None,
+                    created_at=mat.get('creationTime'),
+                    attachments=json.dumps(attachments),
+                    source_link=mat.get('alternateLink')
+                ))
+                existing_local_ids.add(item_id)
 
             # --- Announcements ---
             for ann in announcements:
                 item_id = ann.get('id')
+                if not item_id: continue
+                
+                text = ann.get('text', '')
+                if not text: continue
+                
+                title = f"Announcement: {course_name}"
+                desc = text[:1000]
+                ann_materials = ann.get('materials', [])
+
+                # Build rich content including any file/link attachments
+                content = f"Announcement from {professor} in {course_name}:\n{text}"
+                attachments = []
+                if ann_materials:
+                    mat_text, attachments = self._format_materials(ann_materials)
+                    content += f"\nAttached Materials:\n{mat_text}"
+
                 # Index the announcement text itself
                 if force_reindex or item_id not in existing_local_ids:
                     asyncio.create_task(self._index_item(
@@ -235,6 +290,20 @@ class LMSSyncService:
 
                 if item_id in existing_local_ids:
                     continue
+
+                new_materials.append(Material(
+                    id=item_id,
+                    user_id=user_id,
+                    course_id=course_id,
+                    title=title,
+                    content=desc,
+                    type="announcement",
+                    due_date=None,
+                    created_at=ann.get('creationTime'),
+                    attachments=json.dumps(attachments),
+                    source_link=ann.get('alternateLink')
+                ))
+                existing_local_ids.add(item_id)
 
 
             # Bulk insert all new items in one transaction

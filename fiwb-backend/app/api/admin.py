@@ -28,7 +28,7 @@ def get_all_courses(admin_email: str, db: Session = Depends(get_db)):
     verify_admin(admin_email)
     return db.query(Course).all()
 
-async def _run_full_sync(user_email: str):
+async def _run_full_sync(user_email: str, force_reindex: bool = False):
     """Background sync task that uses the stored token from DB."""
     db = SessionLocal()
     try:
@@ -45,8 +45,8 @@ async def _run_full_sync(user_email: str):
     try:
         from app.lms.sync_service import LMSSyncService
         svc = LMSSyncService(access_token, user_email, refresh_token)
-        await svc.sync_all_courses()
-        logger.info(f"[Admin Sync] Classroom sync triggered for {user_email}")
+        await svc.sync_all_courses(force_reindex=force_reindex)
+        logger.info(f"[Admin Sync] Classroom sync triggered for {user_email} (force={force_reindex})")
     except Exception as e:
         logger.error(f"[Admin Sync] Classroom failed for {user_email}: {e}")
 
@@ -61,7 +61,7 @@ async def _run_full_sync(user_email: str):
         logger.error(f"[Admin Sync] Gmail failed for {user_email}: {e}")
 
 @router.post("/sync/{user_email}")
-async def trigger_sync(user_email: str, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+async def trigger_sync(user_email: str, background_tasks: BackgroundTasks, force_reindex: bool = False, db: Session = Depends(get_db)):
     """Manually trigger a full sync (Classroom + Gmail) for a specific user."""
     email = standardize_email(user_email)
     user = db.query(User).filter(User.email == email).first()
@@ -70,14 +70,15 @@ async def trigger_sync(user_email: str, background_tasks: BackgroundTasks, db: S
     if not user.access_token:
         raise HTTPException(status_code=400, detail="No access token stored for user.")
 
-    background_tasks.add_task(_run_full_sync, email)
-    return {"status": "sync_started", "user": email}
+    background_tasks.add_task(_run_full_sync, email, force_reindex=force_reindex)
+    return {"status": "sync_started", "user": email, "force_reindex": force_reindex}
 
 @router.post("/resync-all-data")
 async def resync_all_data(
     background_tasks: BackgroundTasks,
     admin_email: str,
     target_email: str = None,
+    force_reindex: bool = False,
     db: Session = Depends(get_db)
 ):
     """
@@ -91,15 +92,15 @@ async def resync_all_data(
         user = db.query(User).filter(User.email == email).first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
-        background_tasks.add_task(_run_full_sync, email)
-        return {"status": "started", "users": [email]}
+        background_tasks.add_task(_run_full_sync, email, force_reindex=force_reindex)
+        return {"status": "started", "users": [email], "force_reindex": force_reindex}
 
     # All users with tokens
     users = db.query(User).filter(User.access_token.isnot(None)).all()
     for u in users:
-        background_tasks.add_task(_run_full_sync, u.email)
+        background_tasks.add_task(_run_full_sync, u.email, force_reindex=force_reindex)
     
-    return {"status": "started", "users": [u.email for u in users]}
+    return {"status": "started", "users": [u.email for u in users], "force_reindex": force_reindex}
 
 @router.post("/cleanup/{user_email}")
 async def cleanup_user_data(user_email: str, db: Session = Depends(get_db)):
