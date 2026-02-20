@@ -256,7 +256,14 @@ class LMSSyncService:
                     continue
                 title = f"Announcement: {course_name}"
                 desc = text[:1000]
+                ann_materials = ann.get('materials', [])
+
+                # Build rich content including any file/link attachments
                 content = f"Announcement from {professor} in {course_name}:\n{text}"
+                attachments = []
+                if ann_materials:
+                    mat_text, attachments = self._format_materials(ann_materials)
+                    content += f"\nAttached Materials:\n{mat_text}"
 
                 new_materials.append(Material(
                     id=item_id,
@@ -267,14 +274,21 @@ class LMSSyncService:
                     type="announcement",
                     due_date=None,
                     created_at=ann.get('creationTime'),
-                    attachments=json.dumps([]),
+                    attachments=json.dumps(attachments),
                     source_link=ann.get('alternateLink')
                 ))
                 existing_local_ids.add(item_id)
 
+                # Index the announcement text itself
                 asyncio.create_task(self._index_item(
                     content, title, desc, item_id, course_id, course_name, professor, "announcement", ann.get('alternateLink')
                 ))
+
+                # Index every Drive file attached to this announcement
+                if ann_materials:
+                    asyncio.create_task(self._index_announcement_drive_files(
+                        ann_materials, item_id, text, course_id, course_name, professor
+                    ))
 
             # Bulk insert all new items in one transaction
             if new_materials:
@@ -309,6 +323,74 @@ class LMSSyncService:
             await self.sm_client.add_document(content, metadata, title=title, description=desc[:200])
         except Exception as e:
             logger.warning(f"[Sync] Supermemory index failed for {item_id}: {e}")
+
+    async def _index_announcement_drive_files(
+        self, materials: list, ann_id: str, ann_text: str,
+        course_id: str, course_name: str, professor: str
+    ):
+        """
+        For every Drive file attached to an announcement, download its content
+        and index it into Supermemory so the AI can answer questions about it.
+        """
+        from app.lms.drive_service import DriveSyncService
+
+        drive_svc = DriveSyncService(self.access_token, self.user_email, self.refresh_token)
+
+        for mat in materials:
+            if 'driveFile' not in mat:
+                continue  # Skip YouTube/links/forms — only Drive files have parseable content
+
+            df = mat['driveFile'].get('driveFile', {})
+            file_id = df.get('id', '')
+            file_title = df.get('title', 'Drive File')
+            file_link = df.get('alternateLink', '')
+            mime = df.get('mimeType', '')
+
+            if not file_id:
+                continue
+
+            try:
+                file_meta = {'id': file_id, 'mimeType': mime, 'name': file_title}
+                extracted = await drive_svc._get_file_content(file_meta)
+
+                if extracted and len(extracted.strip()) >= 50:
+                    # Rich content — prepend announcement context so retrieval is meaningful
+                    full_content = (
+                        f"Course Material (Drive Attachment) shared by {professor} in {course_name}\n"
+                        f"From Announcement: {ann_text[:400]}\n\n"
+                        f"--- File: {file_title} ---\n{extracted}"
+                    )
+                else:
+                    # File had no extractable text (e.g. image); still index the metadata
+                    full_content = (
+                        f"Drive file '{file_title}' attached to an announcement by {professor} in {course_name}.\n"
+                        f"Announcement: {ann_text[:600]}"
+                    )
+
+                metadata = {
+                    "user_id": self.user_email,
+                    "course_id": course_id,
+                    "course_name": course_name,
+                    "professor": professor,
+                    "type": "announcement_drive_attachment",
+                    "source_id": f"ann_{ann_id}_drive_{file_id}",
+                    "source": "google_classroom",
+                    "source_link": file_link,
+                    "file_title": file_title,
+                    "mime_type": mime,
+                    "parent_announcement_id": ann_id,
+                }
+
+                await self.sm_client.add_document(
+                    content=full_content,
+                    metadata=metadata,
+                    title=f"[{course_name}] {file_title}",
+                    description=f"Drive attachment from professor announcement"
+                )
+                logger.info(f"[Sync] Indexed Drive attachment '{file_title}' from announcement {ann_id} ({course_name})")
+
+            except Exception as e:
+                logger.warning(f"[Sync] Failed to index Drive attachment '{file_title}' (ann={ann_id}): {e}")
 
     def _format_date(self, date_dict: dict) -> str:
         if not date_dict:
