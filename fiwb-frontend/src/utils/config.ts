@@ -1,4 +1,4 @@
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8001';
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://passionate-patience-production-a232.up.railway.app';
 
 export const standardize_email = (email: string | null): string => {
     if (!email) return "";

@@ -258,7 +258,8 @@ async def chat_stream(
             
         except Exception as e:
             logger.error(f"Critical System Stream Failure: {e}", exc_info=True)
-            yield f"data: {json.dumps({'token': '\n\n[Neural Link Reset]: The system encounterd a capacity issue. Please refresh.'})}\n\n"
+            error_msg = json.dumps({'token': '\n\n[Neural Link Reset]: The system encounterd a capacity issue. Please refresh.'})
+            yield f"data: {error_msg}\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream")
 
