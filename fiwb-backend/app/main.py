@@ -23,9 +23,15 @@ app = FastAPI(
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # 2. CORS Optimization
+# NOTE: Cannot use allow_origins=["*"] with allow_credentials=True — browsers reject this combination.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], 
+    allow_origins=[
+        "https://app.fiwbai.xyz",
+        "https://fiwb-a-local.vercel.app",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
