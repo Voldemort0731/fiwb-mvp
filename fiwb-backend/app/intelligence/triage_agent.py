@@ -30,7 +30,7 @@ async def classify_query(query: str, base64_image: str = None) -> str:
         if base64_image:
             user_content.append({
                 "type": "image_url",
-                "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
+                "image_url": {"url": base64_image}
             })
             
         messages.append({"role": "user", "content": user_content})

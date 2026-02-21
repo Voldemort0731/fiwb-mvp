@@ -158,7 +158,7 @@ You are an elite academic mentor and Socratic tutor.
         if base64_image:
             final_query_content.append({
                 "type": "image_url",
-                "image_url": {"url": f"data:image/jpeg;base64,{base64_image}"}
+                "image_url": {"url": base64_image}
             })
             
         final_query_content.append({"type": "text", "text": user_query})
