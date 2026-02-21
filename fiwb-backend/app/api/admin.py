@@ -21,7 +21,24 @@ def verify_admin(admin_email: str):
 def get_users(admin_email: str, db: Session = Depends(get_db)):
     verify_admin(admin_email)
     users = db.query(User).all()
-    return [{"id": u.id, "email": u.email, "last_synced": u.last_synced} for u in users]
+    results = []
+    for u in users:
+        # Get up to 50 latest material titles for this user
+        materials = db.query(Material).filter(Material.user_id == u.id).order_by(Material.id.desc()).all()
+        titles = [m.title for m in materials]
+        results.append({
+            "id": u.id,
+            "email": u.email,
+            "last_synced": u.last_synced,
+            "created_at": u.created_at,
+            "openai_tokens_used": u.openai_tokens_used,
+            "supermemory_docs_indexed": u.supermemory_docs_indexed,
+            "supermemory_requests_count": u.supermemory_requests_count,
+            "lms_api_requests_count": u.lms_api_requests_count,
+            "estimated_cost_usd": u.estimated_cost_usd,
+            "document_titles": titles
+        })
+    return results
 
 @router.get("/courses")
 def get_all_courses(admin_email: str, db: Session = Depends(get_db)):

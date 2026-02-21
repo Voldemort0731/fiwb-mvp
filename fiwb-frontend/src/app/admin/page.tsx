@@ -90,6 +90,7 @@ export default function AdminDashboard() {
                             <thead>
                                 <tr className="text-[10px] uppercase tracking-widest font-black text-gray-600 dark:text-gray-500 border-b border-gray-200 dark:border-white/5">
                                     <th className="px-8 py-5">Intellectual Identity</th>
+                                    <th className="px-8 py-5">Neural Archive (Titles)</th>
                                     <th className="px-8 py-5 text-center">Neural Tokens</th>
                                     <th className="px-8 py-5 text-center">SM Index/Req</th>
                                     <th className="px-8 py-5 text-center">LMS Requests</th>
@@ -108,6 +109,19 @@ export default function AdminDashboard() {
                                                     <p className="font-bold text-gray-900 dark:text-white">{user.email}</p>
                                                     <p className="text-[10px] text-gray-600 dark:text-gray-500 uppercase font-bold tracking-wider">Joined {new Date(user.created_at).toLocaleDateString()}</p>
                                                 </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-8 py-6">
+                                            <div className="max-h-24 w-64 overflow-y-auto scrollbar-hide flex flex-wrap gap-1">
+                                                {user.document_titles?.length > 0 ? (
+                                                    user.document_titles.slice(0, 100).map((title: string, idx: number) => (
+                                                        <span key={idx} className="inline-block px-1.5 py-0.5 rounded bg-gray-50 dark:bg-white/5 border border-gray-100 dark:border-white/5 text-[9px] text-gray-500 dark:text-gray-400 truncate max-w-[120px]">
+                                                            {title}
+                                                        </span>
+                                                    ))
+                                                ) : (
+                                                    <span className="text-[9px] italic text-gray-400">No documents indexed yet.</span>
+                                                )}
                                             </div>
                                         </td>
                                         <td className="px-8 py-6 text-center font-mono text-xs text-purple-400">
