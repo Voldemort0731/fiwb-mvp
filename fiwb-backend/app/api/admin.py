@@ -23,8 +23,11 @@ def get_users(admin_email: str, db: Session = Depends(get_db)):
     users = db.query(User).all()
     results = []
     for u in users:
-        # Get up to 50 latest material titles for this user
-        materials = db.query(Material).filter(Material.user_id == u.id).order_by(Material.id.desc()).all()
+        # Get latest document titles for this user (exclude announcements)
+        materials = db.query(Material).filter(
+            Material.user_id == u.id,
+            Material.type.in_(['assignment', 'material'])
+        ).order_by(Material.id.desc()).all()
         titles = [m.title for m in materials]
         results.append({
             "id": u.id,
