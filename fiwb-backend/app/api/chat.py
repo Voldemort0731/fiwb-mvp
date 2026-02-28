@@ -259,28 +259,40 @@ async def chat_stream(
                         
                         mat_id = meta.get("id") or meta.get("source_id")
                         
-                        # AUTOMATED RESOLUTION: Swap announcement IDs for attachment IDs for better Analyze UX
                         if meta.get("type") == "announcement":
-                            # Check if we already have a focused attachment for this announcement in c_data
                             found_att = False
-                            for other in c_data.get("course_context", []):
-                                om = other.get("metadata", {})
-                                if om.get("type") == "attachment" and om.get("source_id") == mat_id:
-                                    mat_id = om.get("id") # Promote the attachment as the analyze target
-                                    found_att = True
-                                    break
-                            
-                            # If not found in current context, check DB if m is reachable (session still open)
-                            if not found_att:
-                                try:
-                                    ann_id = meta.get("id")
-                                    if ann_id:
+                            ann_id = meta.get("id")
+                            if ann_id:
+                                # 1. Check current context for child attachments (Fastest)
+                                for other in c_data.get("course_context", []):
+                                    om = other.get("metadata", {})
+                                    if om.get("source_id") == ann_id or om.get("parent_announcement_id") == ann_id:
+                                        mat_id = om.get("id")
+                                        found_att = True
+                                        break
+                                
+                                # 2. Check DB for focused attachment materials (Authoritative)
+                                if not found_att:
+                                    try:
                                         m_record = db.query(Material).filter(Material.id == ann_id).first()
                                         if m_record and m_record.attachments:
-                                            atts = json.loads(m_record.attachments)
-                                            if atts and len(atts) > 0:
-                                                mat_id = atts[0].get("id") or atts[0].get("file_id")
-                                except: pass
+                                            try:
+                                                atts = json.loads(m_record.attachments)
+                                                if atts and len(atts) > 0:
+                                                    first_att = atts[0]
+                                                    mat_id = first_att.get("id") or first_att.get("file_id") or first_att.get("fid") # check all variants
+                                                    found_att = True
+                                            except: pass
+                                        
+                                        # 3. Fallback to broad search if needed
+                                        if not found_att:
+                                            child_att = db.query(Material).filter(
+                                                (Material.id.like(f"%{ann_id}%")) | (Material.source_link.like(f"%{ann_id}%")),
+                                                Material.type.in_(["drive_file", "attachment"])
+                                            ).first()
+                                            if child_att:
+                                                mat_id = child_att.id
+                                    except: pass
 
                         if full_title not in sources_dict:
                             sources_dict[full_title] = {

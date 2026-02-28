@@ -378,6 +378,7 @@ class LMSSyncService:
         """Fire-and-forget Supermemory indexing. Errors here never affect the main sync."""
         try:
             metadata = {
+                "title": title, # ESSENTIAL: Used for source labeling in the UI
                 "user_id": self.user_email,
                 "course_id": course_id,
                 "course_name": course_name,
@@ -505,7 +506,7 @@ class LMSSyncService:
                     "course_name":            course_name,
                     "professor":              professor,
                     "type":                   "announcement_drive_attachment",
-                    "source_id":              f"ann_{ann_id}_drive_{file_id}",
+                    "source_id":              f"ann_att_{file_id}",
                     "source":                 "google_classroom",
                     "source_link":            file_link,
                     "file_title":             file_title,

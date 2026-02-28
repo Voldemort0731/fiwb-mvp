@@ -180,12 +180,20 @@ def get_material(material_id: str, user_email: str, db: Session = Depends(get_db
         # Normalize: ensure id exists even if it's file_id
         atts = []
         for a in raw_atts:
+            # Google Classroom structure check: unwraps nested driveFile or link objects
+            df = a.get("driveFile", {}).get("driveFile", {}) if "driveFile" in a else a
+            
+            fid = df.get("id") or df.get("file_id") or a.get("id")
+            title = df.get("title") or a.get("title") or "Attachment"
+            url = df.get("alternateLink") or a.get("url") or a.get("alternateLink")
+            mime = df.get("mimeType") or a.get("mime_type") or ""
+            
             atts.append({
-                "id": a.get("id") or a.get("file_id"),
-                "title": a.get("title") or "Attachment",
-                "url": a.get("url") or a.get("alternateLink"),
-                "type": a.get("type") or a.get("type"),
-                "file_type": a.get("file_type") or ("pdf" if "pdf" in (a.get("mime_type") or "").lower() else "document")
+                "id": fid,
+                "title": title,
+                "url": url,
+                "type": a.get("type", "drive_file"),
+                "file_type": "pdf" if "pdf" in mime.lower() or title.lower().endswith(".pdf") else "document"
             })
     except:
         atts = []
