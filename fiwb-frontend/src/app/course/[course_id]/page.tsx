@@ -340,7 +340,7 @@ export default function CoursePage() {
                                     <div className="bg-gray-50 dark:bg-black/40 p-6 rounded-2xl border border-gray-100 dark:border-white/5">
                                         <h3 className="text-sm font-bold uppercase tracking-widest text-gray-600 dark:text-gray-500 mb-3">Content</h3>
                                         <p className="text-gray-800 dark:text-gray-300 font-medium leading-relaxed whitespace-pre-wrap">
-                                            {selectedItem.description || "No additional details available for this item."}
+                                            {selectedItem.content || selectedItem.description || "No additional details available for this item."}
                                         </p>
                                     </div>
 

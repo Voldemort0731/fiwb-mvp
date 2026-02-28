@@ -25,16 +25,30 @@ def get_courses(user_email: str, db: Session = Depends(get_db)):
     count = len(user.courses)
     logger.info(f"[API] Found user {user.id} ({user.email}), returning {count} courses")
     
-    return [
-        {
+    results = []
+    for c in user.courses:
+        latest = db.query(Material).filter(
+            Material.course_id == c.id,
+            or_(Material.user_id == user.id, Material.user_id == None)
+        ).order_by(Material.created_at.desc()).first()
+        
+        latest_text = None
+        if latest:
+            if latest.content:
+                latest_text = f"[{latest.type.capitalize()}] {latest.content[:100]}..."
+            else:
+                latest_text = f"[{latest.type.capitalize()}] {latest.title}"
+
+        results.append({
             "id": c.id,
             "name": c.name,
             "professor": c.professor or "Unknown",
             "platform": c.platform,
-            "last_synced": c.last_synced.isoformat() if c.last_synced else None
-        }
-        for c in user.courses
-    ]
+            "last_synced": c.last_synced.isoformat() if c.last_synced else None,
+            "latest_update": latest_text
+        })
+        
+    return results
 
 @router.get("/{course_id}")
 def get_course(course_id: str, user_email: str, db: Session = Depends(get_db)):

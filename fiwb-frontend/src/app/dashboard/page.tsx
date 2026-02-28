@@ -404,6 +404,11 @@ export default function Dashboard() {
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">{course.platform}</span>
                                                 </div>
+                                                {course.latest_update && (
+                                                    <p className="text-[11px] text-gray-500 font-medium truncate mt-1">
+                                                        {course.latest_update}
+                                                    </p>
+                                                )}
                                             </div>
                                             <ChevronRight size={14} className="text-gray-300 group-hover:text-blue-500 transition-all translate-x-0 group-hover:translate-x-1" />
                                         </div>
