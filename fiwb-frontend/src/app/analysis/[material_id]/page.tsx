@@ -116,6 +116,32 @@ function MessageContent({ content, onCitationClick, onQuestionClick }: {
 
     // Remove the suggested questions section from rendered content for separate rendering
     let cleanContent = content;
+    const splitTokens = ["**💡 Dive Deeper:**", "💡 Dive Deeper:", "**Suggested Questions", "Suggested Questions:", "💡 Suggested Questions"];
+    for (const token of splitTokens) {
+        if (cleanContent.includes(token)) {
+            // Keep everything before the token, trim trailing whitespace
+            cleanContent = cleanContent.split(token)[0].trimEnd();
+            break;
+        }
+    }
+
+    // Process children to replace [n] patterns with clickable buttons
+    const processChildren = (kids: React.ReactNode): React.ReactNode => {
+        return React.Children.map(kids, (child) => {
+            if (typeof child !== 'string') return child;
+
+            const parts = child.split(/\[(\d+)\]/g);
+            if (parts.length === 1) return child;
+
+            return parts.map((part, i) => {
+                if (i % 2 === 1) {
+                    const num = parseInt(part);
+                    return <CitationButton key={i} num={num} onClick={() => onCitationClick(num)} />;
+                }
+                return part;
+            });
+        });
+    };
 
     return (
         <div className="space-y-4">
@@ -123,24 +149,6 @@ function MessageContent({ content, onCitationClick, onQuestionClick }: {
                 remarkPlugins={[remarkGfm]}
                 components={{
                     p: ({ children }) => {
-                        // Process children to replace [n] patterns with clickable buttons
-                        const processChildren = (kids: React.ReactNode): React.ReactNode => {
-                            return React.Children.map(kids, (child) => {
-                                if (typeof child !== 'string') return child;
-
-                                const parts = child.split(/\[(\d+)\]/g);
-                                if (parts.length === 1) return child;
-
-                                return parts.map((part, i) => {
-                                    if (i % 2 === 1) {
-                                        const num = parseInt(part);
-                                        return <CitationButton key={i} num={num} onClick={() => onCitationClick(num)} />;
-                                    }
-                                    return part;
-                                });
-                            });
-                        };
-
                         return <p className="mb-3 last:mb-0 leading-relaxed">{processChildren(children)}</p>;
                     },
                     h1: ({ children }) => <h1 className="text-lg font-black text-white mt-4 mb-2">{children}</h1>,
@@ -149,13 +157,10 @@ function MessageContent({ content, onCitationClick, onQuestionClick }: {
                     ul: ({ children }) => <ul className="list-disc ml-5 mb-3 space-y-1.5">{children}</ul>,
                     ol: ({ children }) => <ol className="list-decimal ml-5 mb-3 space-y-1.5">{children}</ol>,
                     li: ({ children }) => {
-                        // Check if this is a suggested question
-                        const text = typeof children === 'string' ? children :
-                            Array.isArray(children) ? children.map(c => typeof c === 'string' ? c : '').join('') : '';
-
-                        return <li className="text-gray-300">{children}</li>;
+                        return <li className="text-gray-300 pl-1 marker:text-gray-500">{processChildren(children)}</li>;
                     },
                     strong: ({ children }) => <strong className="text-white font-bold">{children}</strong>,
+
                     em: ({ children }) => <em className="text-blue-300 italic">{children}</em>,
                     code: ({ className, children }) => {
                         const isInline = !className;
