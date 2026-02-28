@@ -146,15 +146,6 @@ export default function CoursePage() {
         }
     };
 
-    const handleDownload = (attachment: any) => {
-        if (attachment.file_id) {
-            // For Google Drive files, use the export=download endpoint
-            window.open(`https://drive.google.com/uc?id=${attachment.file_id}&export=download`, '_blank');
-        } else {
-            window.open(attachment.url, '_blank');
-        }
-    };
-
     return (
         <div className="flex h-screen bg-white dark:bg-[#050505] text-gray-900 dark:text-white font-sans selection:bg-blue-500/30 overflow-hidden transition-colors duration-500">
             <Sidebar />
@@ -571,15 +562,7 @@ export default function CoursePage() {
                                                                     >
                                                                         <ExternalLink size={16} className="text-gray-400 group-hover/btn:text-green-400" />
                                                                     </a>
-                                                                    {attachment.file_type !== 'youtube' && attachment.file_type !== 'web' && (
-                                                                        <button
-                                                                            onClick={() => handleDownload(attachment)}
-                                                                            className="p-2 glass-dark hover:bg-purple-500/20 rounded-lg transition-colors group/btn cursor-pointer"
-                                                                            title="Download"
-                                                                        >
-                                                                            <Download size={16} className="text-gray-400 group-hover/btn:text-purple-400" />
-                                                                        </button>
-                                                                    )}
+
                                                                 </div>
                                                             </div>
                                                         </div>
