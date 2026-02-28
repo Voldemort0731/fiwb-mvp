@@ -41,6 +41,13 @@ class DriveSyncService:
                 raise e
         return self.service
 
+    async def get_refreshed_access_token(self):
+        """Force a token refresh if needed and return current token."""
+        from google.auth.transport.requests import Request
+        import asyncio
+        await asyncio.to_thread(self.creds.refresh, Request())
+        return self.creds.token
+
     async def list_root_folders(self):
         """List folders in the root of Google Drive."""
         service = await self._get_service()
@@ -55,31 +62,105 @@ class DriveSyncService:
         UsageTracker.log_lms_request(self.user_email)
         return results.get('files', [])
 
+    async def sync_items(self, item_ids: list):
+        """Sync multiple items (files or folders)."""
+        service = await self._get_service()
+        total_synced = 0
+        
+        # Initial Setup for Google Drive Course
+        db = SessionLocal()
+        try:
+            drive_course = db.query(Course).filter(Course.id == "GOOGLE_DRIVE").first()
+            if not drive_course:
+                drive_course = Course(id="GOOGLE_DRIVE", name="Personal Google Drive", professor="Self", platform="Google Drive")
+                db.add(drive_course)
+                db.commit()
+            
+            user = db.query(User).filter(User.email == self.user_email).first()
+            if user and drive_course not in user.courses:
+                user.courses.append(drive_course)
+                db.commit()
+            user_id = user.id if user else None
+        finally:
+            db.close()
+
+        for item_id in item_ids:
+            try:
+                async with GLOBAL_API_LOCK:
+                    item = await asyncio.to_thread(
+                        lambda: service.files().get(fileId=item_id, fields="id, name, mimeType, webViewLink, createdTime").execute()
+                    )
+                
+                if item['mimeType'] == 'application/vnd.google-apps.folder':
+                    total_synced += await self.sync_folder(item_id)
+                else:
+                    synced = await self._sync_individual_file(item, user_id)
+                    if synced: total_synced += 1
+            except Exception as e:
+                print(f"Failed to sync item {item_id}: {e}")
+        return total_synced
+
+    async def _sync_individual_file(self, file, user_id):
+        file_id = file['id']
+        check_db = SessionLocal()
+        try:
+            existing = check_db.query(Material).filter(Material.id == file_id).first()
+            if existing: return False
+        finally:
+            check_db.close()
+
+        try:
+            content = await self._get_file_content(file)
+            if not content: return False
+            
+            write_db = SessionLocal()
+            try:
+                new_material = Material(
+                    id=file_id,
+                    user_id=user_id,
+                    course_id="GOOGLE_DRIVE",
+                    title=file['name'],
+                    content=content[:5000], 
+                    type="drive_file",
+                    created_at=file.get('createdTime'),
+                    source_link=file.get('webViewLink'),
+                    attachments=json.dumps([{"id": file_id, "title": file['name'], "url": file.get('webViewLink'), "type": "drive_file"}])
+                )
+                write_db.add(new_material)
+                write_db.commit()
+
+                await self.sm_client.add_document(
+                    content=content,
+                    title=file['name'],
+                    description=f"File from Google Drive",
+                    metadata={"user_id": self.user_email, "source": "google_drive", "file_id": file_id}
+                )
+                UsageTracker.log_index_event(self.user_email, content)
+                return True
+            finally:
+                write_db.close()
+        except Exception as e:
+            print(f"Failed to extract content for {file['name']}: {e}")
+            return False
+
     async def sync_folder(self, folder_id: str):
-        # ... (course/db setup omitted for brevity, unchanged) ...
         # Ensure a virtual "Google Drive" course exists in DB for grouping
         db = SessionLocal()
-        drive_course = db.query(Course).filter(Course.id == "GOOGLE_DRIVE").first()
-        if not drive_course:
-            drive_course = Course(
-                id="GOOGLE_DRIVE",
-                name="Personal Google Drive",
-                professor="Self",
-                platform="Google Drive"
-            )
-            db.add(drive_course)
-            db.commit()
+        try:
+            drive_course = db.query(Course).filter(Course.id == "GOOGLE_DRIVE").first()
+            if not drive_course:
+                drive_course = Course(id="GOOGLE_DRIVE", name="Personal Google Drive", professor="Self", platform="Google Drive")
+                db.add(drive_course)
+                db.commit()
+            
+            user = db.query(User).filter(User.email == self.user_email).first()
+            if user and drive_course not in user.courses:
+                user.courses.append(drive_course)
+                db.commit()
+            user_id = user.id if user else None
+        finally:
+            db.close()
 
-        # Link user to this virtual course
-        user = db.query(User).filter(User.email == self.user_email).first()
-        if user and drive_course not in user.courses:
-            user.courses.append(drive_course)
-            db.commit()
-        
-        user_id = user.id if user else None
-        db.close()
-
-        # Fetch files in folder - support many file types with pagination
         mime_types = [
             'application/pdf', 'text/plain', 'application/vnd.google-apps.document',
             'application/vnd.google-apps.spreadsheet', 'application/vnd.google-apps.presentation',
@@ -91,53 +172,14 @@ class DriveSyncService:
         ]
         
         files = await self._get_all_files_recursive(folder_id, mime_types)
-        print(f"[Production-Drive] Found {len(files)} files for {self.user_email}")
         synced_count = 0
 
         batch_size = 2
         for i in range(0, len(files), batch_size):
             batch = files[i:i + batch_size]
             for file in batch:
-                file_id = file['id']
-                check_db = SessionLocal()
-                try:
-                    existing = check_db.query(Material).filter(Material.id == file_id).first()
-                    if existing: continue
-                finally:
-                    check_db.close()
-
-                try:
-                    content = await self._get_file_content(file)
-                    if not content: continue
-                    
-                    write_db = SessionLocal()
-                    try:
-                        new_material = Material(
-                            id=file_id,
-                            user_id=user_id,
-                            course_id="GOOGLE_DRIVE",
-                            title=file['name'],
-                            content=content[:5000], 
-                            type="drive_file",
-                            created_at=file.get('createdTime'),
-                            source_link=file.get('webViewLink'),
-                            attachments=json.dumps([{"id": file_id, "title": file['name'], "url": file.get('webViewLink'), "type": "drive_file"}])
-                        )
-                        write_db.add(new_material)
-                        write_db.commit()
-
-                        await self.sm_client.add_document(
-                            content=content,
-                            title=file['name'],
-                            description=f"File from Google Drive",
-                            metadata={"user_id": self.user_email, "source": "google_drive", "file_id": file_id}
-                        )
-                        UsageTracker.log_index_event(self.user_email, content)
-                        synced_count += 1
-                    finally:
-                        write_db.close()
-                except Exception as e:
-                    print(f"Failed to extract content for {file['name']}: {e}")
+                synced = await self._sync_individual_file(file, user_id)
+                if synced: synced_count += 1
             await asyncio.sleep(0.5)
         return synced_count
 

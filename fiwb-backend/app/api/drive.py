@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models import User, Material
 from app.lms.drive_service import DriveSyncService
+from app.utils.locks import GLOBAL_API_LOCK
 from pydantic import BaseModel
 from typing import List
 import asyncio
@@ -20,13 +21,12 @@ class DriveUnsyncRequest(BaseModel):
     user_email: str
     folder_ids: List[str]
 
-async def drive_sync_task(user_email: str, access_token: str, refresh_token: str, folder_ids: List[str]):
+async def drive_sync_task(user_email: str, access_token: str, refresh_token: str, item_ids: List[str]):
     service = DriveSyncService(access_token, user_email, refresh_token)
-    for folder_id in folder_ids:
-        try:
-            await service.sync_folder(folder_id)
-        except Exception as e:
-            print(f"Error syncing folder {folder_id} for {user_email}: {e}")
+    try:
+        await service.sync_items(item_ids)
+    except Exception as e:
+        print(f"Error syncing items {item_ids} for {user_email}: {e}")
 
 @router.get("/folders")
 async def get_folders(user_email: str, db: Session = Depends(get_db)):
@@ -62,26 +62,28 @@ async def get_synced_folders(user_email: str, db: Session = Depends(get_db)):
     if not folder_ids:
         return []
     
-    # Try to get folder names from Google Drive API
-    synced_folders = []
+    # Try to get item names from Google Drive API
+    synced_items = []
     try:
         service = DriveSyncService(user.access_token, user.email, user.refresh_token)
-        all_folders = await service.list_root_folders()
-        folder_map = {f['id']: f for f in all_folders}
+        drive_svc = await service._get_service()
         
         for fid in folder_ids:
-            if fid in folder_map:
-                synced_folders.append(folder_map[fid])
-            else:
-                # Folder might have been moved/deleted, still show ID
-                synced_folders.append({"id": fid, "name": f"Folder ({fid[:8]}...)"})
+            try:
+                async with GLOBAL_API_LOCK:
+                    item_meta = await asyncio.to_thread(
+                        lambda fid=fid: drive_svc.files().get(fileId=fid, fields="id, name, mimeType").execute()
+                    )
+                synced_items.append({"id": fid, "name": item_meta.get('name'), "type": item_meta.get('mimeType')})
+            except:
+                # Item might have been deleted or access lost
+                synced_items.append({"id": fid, "name": f"Item ({fid[:8]}...)", "type": "unknown"})
     except Exception as e:
-        logger.error(f"Failed to resolve folder names: {e}")
-        # Fallback: return just the IDs
+        logger.error(f"Failed to resolve item names: {e}")
         for fid in folder_ids:
-            synced_folders.append({"id": fid, "name": f"Folder ({fid[:8]}...)"})
+            synced_items.append({"id": fid, "name": f"Item ({fid[:8]}...)", "type": "unknown"})
     
-    return synced_folders
+    return synced_items
 
 @router.post("/sync")
 async def sync_drive(request: DriveSyncRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):

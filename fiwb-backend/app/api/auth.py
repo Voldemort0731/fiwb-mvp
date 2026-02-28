@@ -123,3 +123,32 @@ async def login(request: LoginRequest, background_tasks: BackgroundTasks, db: Se
     except Exception as e:
         logger.error(f"Login error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Login failed: {str(e)}")
+
+@router.get("/token")
+async def get_google_token(user_email: str, db: Session = Depends(get_db)):
+    """Fetch a fresh Google access token for the user (handles refresh if needed)."""
+    from app.utils.email import standardize_email
+    email = standardize_email(user_email)
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if not user.refresh_token:
+        # Fallback to current access token if no refresh token
+        return {"access_token": user.access_token}
+
+    try:
+        from app.lms.drive_service import DriveSyncService
+        service = DriveSyncService(user.access_token, user.email, user.refresh_token)
+        token = await service.get_refreshed_access_token()
+        
+        # Save refreshed token if it changed
+        if token != user.access_token:
+            user.access_token = token
+            db.commit()
+            
+        return {"access_token": token}
+    except Exception as e:
+        logger.error(f"Failed to refresh token for {email}: {e}")
+        # Return what we have as a fallback
+        return {"access_token": user.access_token}
