@@ -125,6 +125,10 @@ function MessageContent({ content, onCitationClick, onQuestionClick }: {
         }
     }
 
+    // Remove internal system tags that leak into the UI
+    cleanContent = cleanContent.replace(/\[PERSONAL_REASONING:[\s\S]*?\]\n*/gi, '').trim();
+    cleanContent = cleanContent.replace(/\[DOCUMENTS_REFERENCED:[\s\S]*?\]\n*/gi, '').trim();
+
     // Process children to replace [n] patterns with clickable buttons
     const processChildren = (kids: React.ReactNode): React.ReactNode => {
         return React.Children.map(kids, (child) => {

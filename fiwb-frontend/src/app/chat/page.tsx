@@ -64,7 +64,11 @@ function MessageContent({
         : [];
 
     // Remove the inquiries block from main content for cleaner markdown view
-    const mainContent = content.replace(inquiryRegex, '').trim();
+    let mainContent = content.replace(inquiryRegex, '').trim();
+
+    // Remove internal system tags that leak into the UI
+    mainContent = mainContent.replace(/\[PERSONAL_REASONING:[\s\S]*?\]\n*/gi, '').trim();
+    mainContent = mainContent.replace(/\[DOCUMENTS_REFERENCED:[\s\S]*?\]\n*/gi, '').trim();
 
     // Heuristic for citation to page mapping
     // AI usually lists citations at the end: [1] Title [Page 5]
