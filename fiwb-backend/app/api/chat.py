@@ -34,9 +34,8 @@ async def extract_text_from_file_threaded(file: UploadFile) -> str:
                 pdf_reader = pypdf.PdfReader(io.BytesIO(content))
                 text = ""
                 for i, page in enumerate(pdf_reader.pages):
-                    page_text = page.extract_text() or ""
-                    # Add unique reference point for the AI
-                    text += f"\n\n--- [PAGE {i+1}] ---\n\n{page_text}"
+                    text += f"\n--- [PAGE {i+1}] ---\n"
+                    text += page.extract_text() or ""
                 return text
             except Exception as e:
                 logger.error(f"PDF extraction failed: {e}")

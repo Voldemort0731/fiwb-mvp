@@ -324,13 +324,31 @@ function AnalysisBody() {
 
     // Navigate PDF to page
     const navigateToPage = useCallback((pageNum: number) => {
-        if (iframeRef.current && activeAttachment) {
-            const baseUrl = activeAttachment.url.replace('/view', '/preview');
-            // Google Drive PDF viewer supports page parameter
-            const separator = baseUrl.includes('?') ? '&' : '?';
-            iframeRef.current.src = `${baseUrl}${separator}page=${pageNum}`;
+        if (!iframeRef.current || !activeAttachment) return;
+
+        console.log(`Navigating to page ${pageNum} for ${activeAttachment.title}`);
+
+        let targetUrl = "";
+        const isDrive = activeAttachment.url?.includes('drive.google.com');
+
+        if (isDrive) {
+            // Use the proxy URL as base
+            targetUrl = `${API_URL}/api/courses/proxy/drive/${activeAttachment.id}?user_email=${userEmail}`;
+        } else {
+            // Direct preview URL
+            targetUrl = activeAttachment.url?.replace('/view', '/preview') || "";
         }
-    }, [activeAttachment]);
+
+        // Append page as fragment (Standard for PDF viewers to jump without reload)
+        const finalUrl = `${targetUrl}#page=${pageNum}`;
+
+        // Force update if it's the same base URL to ensure fragment jump
+        if (iframeRef.current.src.split('#')[0] === finalUrl.split('#')[0]) {
+            iframeRef.current.src = `${targetUrl}&_t=${Date.now()}#page=${pageNum}`;
+        } else {
+            iframeRef.current.src = finalUrl;
+        }
+    }, [activeAttachment, userEmail]);
 
     // Main send message function
     const sendMessage = async (query: string, attachmentText?: string) => {

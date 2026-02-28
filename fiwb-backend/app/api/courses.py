@@ -202,74 +202,48 @@ def get_material(material_id: str, user_email: str, db: Session = Depends(get_db
 
 @router.get("/proxy/drive/{file_id}")
 async def proxy_drive_file(file_id: str, user_email: str, db: Session = Depends(get_db)):
-    """
-    Robust backend proxy that:
-    1. Forces token refresh to prevent session expiry during stream.
-    2. Streams chunks directly from Google to unblock the browser.
-    """
+    """Backend proxy to serve Google Drive files directly, bypassing iframe login issues."""
     email = standardize_email(user_email)
     user = db.query(User).filter(User.email == email).first()
     if not user or not user.access_token:
-        raise HTTPException(status_code=401, detail="Unauthorized")
+        raise HTTPException(status_code=401, detail="Unauthorized: Google credentials missing")
 
-    # 1. Force token refresh to ensure it lasts for the whole stream
+    # Sync with DriveService logic
     drive = DriveSyncService(user.access_token, email, user.refresh_token)
-    try:
-        await drive.get_refreshed_access_token()
-    except Exception as e:
-        logger.error(f"Token refresh failed for proxy: {e}")
-        # If refresh fails, we can't proxy. 
-        raise HTTPException(status_code=401, detail="Session expired. Please re-authenticate.")
-
     service = await drive._get_service()
     
     try:
-        # 2. Get Metadata
+        # 1. Get Metadata for MimeType
         meta = await asyncio.to_thread(service.files().get(fileId=file_id, fields="mimeType, name").execute)
         mime_type = meta.get('mimeType', 'application/octet-stream')
         
-        # 3. Handle Media Request
+        # 2. Prepare Download/Export Request
         if 'google-apps' in mime_type:
+            # Export Google Docs to PDF for viewing
             request = service.files().export_media(fileId=file_id, mimeType='application/pdf')
             final_mime = 'application/pdf'
         else:
             request = service.files().get_media(fileId=file_id)
             final_mime = mime_type
 
-        # 4. CHUNKED STREAMING (Fixes "running out" and timeout issues)
+        # 3. Stream the content
+        from googleapiclient.http import MediaIoBaseDownload
+        fh = io.BytesIO()
+        downloader = MediaIoBaseDownload(fh, request)
+        
         async def stream_generator():
-            from googleapiclient.http import MediaIoBaseDownload
-            fh = io.BytesIO()
-            downloader = MediaIoBaseDownload(fh, request, chunksize=1024*1024) # 1MB chunks
-            
             done = False
-            last_pos = 0
             while not done:
-                # downloader.next_chunk returns (status, done)
-                try:
-                    status, done = await asyncio.to_thread(downloader.next_chunk)
-                    
-                    # Yield ONLY the new bytes since last chunk
-                    fh.seek(last_pos)
-                    chunk_data = fh.read()
-                    if chunk_data:
-                        yield chunk_data
-                        last_pos = fh.tell()
-                except Exception as stream_err:
-                    logger.error(f"Streaming error mid-way: {stream_err}")
-                    break
+                status, done = await asyncio.to_thread(downloader.next_chunk)
+            
+            fh.seek(0)
+            yield fh.read()
 
         return StreamingResponse(
             stream_generator(), 
             media_type=final_mime,
-            headers={
-                "Content-Disposition": f"inline; filename={meta.get('name', 'file')}",
-                "Cache-Control": "no-cache",
-                "X-Content-Type-Options": "nosniff"
-            }
+            headers={"Content-Disposition": f"inline; filename={meta.get('name', 'file')}"}
         )
     except Exception as e:
         logger.error(f"Proxy failed for {file_id}: {e}")
-        # Explicitly avoid returning HTML (like Google login page) 
-        # By raising HTTPException, FastAPI ensures an application/json or simple text error
-        raise HTTPException(status_code=500, detail="Failed to retrieve document stream.")
+        raise HTTPException(status_code=500, detail=str(e))
