@@ -335,8 +335,29 @@ export default function CoursePage() {
                                                                     <button
                                                                         onClick={(e) => {
                                                                             e.stopPropagation();
-                                                                            const attList = (item.attachments || []).map((a: any) => a.title).join(', ');
-                                                                            const query = `Summarize this announcement from ${course?.name}: "${item.content || item.title}". ${attList ? `Also, analyze and summarize these attached documents: ${attList}.` : ''}`;
+
+                                                                            // 1. Collect context from the announcement itself
+                                                                            let context = `Announcement from ${course?.name}: "${item.content || item.title}"\n\n`;
+
+                                                                            // 2. Try to find and include actual content for each attachment
+                                                                            const attachmentsContext = (item.attachments || []).map((att: any) => {
+                                                                                // Search in the 'content' list we fetched earlier (materials/assignments/etc)
+                                                                                // The sync service now saves these as 'ann_att_{file_id}'
+                                                                                const fullItem = content.find(c =>
+                                                                                    c.id === att.file_id ||
+                                                                                    c.id === att.id ||
+                                                                                    c.id === `ann_att_${att.file_id}`
+                                                                                );
+
+                                                                                if (fullItem && fullItem.content) {
+                                                                                    // Truncate to avoid blowing out prompt length, but provide enough for summary
+                                                                                    return `--- ATTACHMENT: ${att.title} ---\n${fullItem.content.substring(0, 1500)}...`;
+                                                                                }
+                                                                                return `--- ATTACHMENT: ${att.title} (Content not pre-loaded, please search for this file) ---`;
+                                                                            }).join('\n\n');
+
+                                                                            const query = `Please provide a detailed summary of this classroom announcement and all its attachments.\n\n${context}${attachmentsContext}\n\nBased on the above, what are the key takeaways and any action items for me?`;
+
                                                                             router.push(`/chat?query=${encodeURIComponent(query)}`);
                                                                         }}
                                                                         className="px-6 py-3 glass-dark hover:bg-blue-600/10 border border-white/5 hover:border-blue-500/20 rounded-2xl text-xs font-black uppercase tracking-widest text-blue-400 transition-all flex items-center gap-2 cursor-pointer"

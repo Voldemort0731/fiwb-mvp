@@ -513,13 +513,45 @@ class LMSSyncService:
                     "parent_announcement_id": ann_id,
                 }
 
-                await self.sm_client.add_document(
-                    content=full_content,
-                    metadata=metadata,
-                    title=f"[{course_name}] {file_title}",
-                    description="Drive file from professor announcement"
-                )
-                UsageTracker.log_index_event(self.user_email, full_content)
+                # --- Step 2: Persist to Local Database ---
+                try:
+                    from app.database import SessionLocal
+                    from app.models import Material
+                    import json
+                    from datetime import datetime
+
+                    db = SessionLocal()
+                    try:
+                        # Check if already exists in this course
+                        existing = db.query(Material).filter(
+                            Material.id == f"ann_att_{file_id}",
+                            Material.course_id == course_id
+                        ).first()
+
+                        if not existing:
+                            new_mat = Material(
+                                id=f"ann_att_{file_id}",
+                                user_id=None, # Will be fixed by sync_service's orphan cleaner
+                                course_id=course_id,
+                                title=file_title,
+                                content=full_content,
+                                type="drive_file",
+                                created_at=datetime.utcnow().isoformat() + "Z",
+                                attachments=json.dumps([{
+                                    "type": "drive", 
+                                    "file_type": "pdf" if "pdf" in mime else "document",
+                                    "title": file_title, "url": file_link, "file_id": file_id
+                                }]),
+                                source_link=file_link
+                            )
+                            db.add(new_mat)
+                            db.commit()
+                            logger.info(f"[Sync] Saved announcement attachment '{file_title}' to database")
+                    finally:
+                        db.close()
+                except Exception as db_err:
+                    logger.warning(f"[Sync] Failed to save Drive attachment to DB: {db_err}")
+
                 logger.info(f"[Sync] Indexed Drive file '{file_title}' from announcement {ann_id} ({course_name})")
 
             except Exception as e:
