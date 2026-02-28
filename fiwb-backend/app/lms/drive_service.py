@@ -133,7 +133,7 @@ class DriveSyncService:
                     content=content,
                     title=file['name'],
                     description=f"File from Google Drive",
-                    metadata={"user_id": self.user_email, "source": "google_drive", "file_id": file_id}
+                    metadata={"user_id": self.user_email, "source": "google_drive", "file_id": file_id, "type": "drive_file"}
                 )
                 UsageTracker.log_index_event(self.user_email, content)
                 return True

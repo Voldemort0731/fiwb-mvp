@@ -71,7 +71,6 @@ Rules:
         # 0. Contextualize first (sequential as it's the search key)
         search_query = await self._contextualize_query(query, history) if history else query
 
-        # 1. Define Filter sets
         # Course Filters
         course_filters = [
             {"key": "user_id", "value": self.user_email, "negate": False},
