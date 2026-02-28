@@ -102,6 +102,7 @@ async def chat_stream(
     thread_id: str = Form("new"), 
     history: str = Form(None), 
     file: UploadFile = File(None),
+    course_id: str = Form(None),
     db: Session = Depends(get_db)
 ):
     """Chat endpoint refactored for institutional high-concurrency scale."""
@@ -177,11 +178,11 @@ async def chat_stream(
             c_data = {}
             if q_type != "general_chat":
                 yield f"data: EVENT:THINKING:Searching your academic vault...\n\n"
-                c_data = await retriever.retrieve_context(message, q_type, history=short_term_history)
+                c_data = await retriever.retrieve_context(message, q_type, history=short_term_history, course_filter=course_id)
             else:
                 yield f"data: EVENT:THINKING:Personalizing response...\n\n"
                 # Even for general chat, we still fetch the profile for personalization
-                c_data = await retriever.retrieve_context(message, "general_chat", history=short_term_history)
+                c_data = await retriever.retrieve_context(message, "general_chat", history=short_term_history, course_filter=course_id)
             
             # BROADCAST SOURCES (Dynamic) - ONLY if not general chat
             sources_dict = {}
