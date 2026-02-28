@@ -279,9 +279,21 @@ export default function CoursePage() {
                                                                         {item.title}
                                                                     </h3>
                                                                 )}
-                                                                <div className="text-gray-800 dark:text-gray-300 font-medium leading-[1.8] whitespace-pre-wrap text-base">
-                                                                    {item.content || item.description || "No description provided."}
-                                                                </div>
+                                                                {item.type !== 'drive_file' ? (
+                                                                    <div className="text-gray-800 dark:text-gray-300 font-medium leading-[1.8] whitespace-pre-wrap text-base">
+                                                                        {item.content || item.description || "No description provided."}
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="p-4 glass-dark rounded-2xl border border-white/5 flex items-center gap-4">
+                                                                        <div className="w-10 h-10 rounded-xl bg-blue-600/10 flex items-center justify-center">
+                                                                            <File size={20} className="text-blue-500" />
+                                                                        </div>
+                                                                        <div>
+                                                                            <p className="text-[10px] font-black uppercase tracking-widest text-gray-500 mb-1">Drive Resource</p>
+                                                                            <p className="text-sm font-bold text-white">Full contents available for AI analysis and details view.</p>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
 
                                                                 {/* Inline Attachments Grid */}
                                                                 {attachmentCount > 0 && (
