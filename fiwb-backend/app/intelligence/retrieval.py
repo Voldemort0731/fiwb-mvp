@@ -96,12 +96,11 @@ Rules:
         # Handle announcements (parent-child relationship)
         ann_id_only = material_id.replace("ann_", "") if material_id and material_id.startswith("ann_") else None
         
-        focused_filters = {
-            "OR": [
-                {"key": "source_id", "value": material_id, "negate": False},
-                {"key": "parent_announcement_id", "value": ann_id_only, "negate": False}
-            ]
-        } if material_id else None
+        or_conditions = [{"key": "source_id", "value": material_id, "negate": False}]
+        if ann_id_only:
+            or_conditions.append({"key": "parent_announcement_id", "value": ann_id_only, "negate": False})
+            
+        focused_filters = {"OR": or_conditions} if material_id else None
 
         # 2. Parallel Search Execution
         UsageTracker.log_sm_request(self.user_email) # Log once for the batch

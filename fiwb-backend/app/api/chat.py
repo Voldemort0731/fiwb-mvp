@@ -288,7 +288,8 @@ async def chat_stream(
                 history=short_term_history,
                 attachment_text=attachment_text,
                 base64_image=attachment_base64 if file_type and file_type.startswith("image/") else None,
-                query_type=q_type
+                query_type=q_type,
+                material_id=material_id
             )
 
             # TOKEN ACCOUNTING
@@ -313,8 +314,9 @@ async def chat_stream(
             
         except Exception as e:
             logger.error(f"Critical System Stream Failure: {e}", exc_info=True)
-            error_msg = json.dumps({'token': '\n\n[Neural Link Reset]: The system encounterd a capacity issue. Please refresh.'})
-            yield f"data: {error_msg}\n\n"
+            # Avoid backslashes in f-strings for Python <3.12 compatibility
+            json_err = json.dumps({'token': '\n\n[Neural Link Reset]: The system encountered a capacity issue. Please refresh.'})
+            yield f"data: {json_err}\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream")
 

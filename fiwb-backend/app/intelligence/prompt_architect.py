@@ -14,7 +14,8 @@ class PromptArchitect:
         attachment_text: str = None,
         base64_image: str = None,
         query_type: str = "academic_question",
-        rewritten_query: str = None
+        rewritten_query: str = None,
+        material_id: str = None
     ) -> List[Dict]:
         """
         Builds a high-fidelity, multi-message conversation for the Socratic Institutional Mentor.
@@ -37,18 +38,28 @@ class PromptArchitect:
 
         for c in retrieved_chunks:
             meta = c.get('metadata', {})
-            # Use unique file identifiers to prevent merging different materials
+            # Handle document identification for deduplication
+            # If we're analyzing a material, don't duplicate it if it's already in 'docs'
+            source_id = meta.get('source_id') or meta.get('documentId')
+            
+            # Match against currently analyzed docs
+            if material_id and source_id == material_id:
+                # We already have the full text in CURRENT_DOCUMENT (if attachment_text was provided)
+                if attachment_text:
+                    continue
+            
+            # Standard naming
             base_title = meta.get('title') or meta.get('file_name') or "Institutional Document"
             course_name = meta.get('course_name') or meta.get('course_id') or ""
             unique_name = f"{base_title} [{course_name}]" if course_name else base_title
             
-            doc_key = meta.get('documentId') or meta.get('file_name') or unique_name
+            doc_key = source_id or meta.get('file_name') or unique_name
             
             if doc_key not in docs:
                 docs[doc_key] = {
                     "title": unique_name,
                     "course": course_name or "General Workspace",
-                    "category": meta.get('type', 'Institutional Material').upper(),
+                    "category": meta.get('type', 'Institutional Material') or "Institutional Material",
                     "author": meta.get('professor', 'Academic Faculty'),
                     "link": meta.get('source_link') or meta.get('url'),
                     "chunks": []
@@ -57,7 +68,9 @@ class PromptArchitect:
         
         for d_info in docs.values():
             content = "\n\n".join(d_info["chunks"])
-            block = f"[{d_info['category']} | {d_info['course']}]\n"
+            # Format category to be uppercase for professional display
+            cat_label = str(d_info['category']).upper()
+            block = f"[{cat_label} | {d_info['course']}]\n"
             block += f"DOCUMENT: {d_info['title']}\n"
             if d_info['link']: block += f"LINK: {d_info['link']}\n"
             block += f"CONTENT: {content}"
@@ -126,14 +139,16 @@ You act as a personal assistant and friend, using a warm and relatable tone.
         elif query_type == "notebook_analysis":
             SYSTEM_PROMPT = f"""
 # IDENTITY: Institutional Synthesis Engine (NotebookCore)
-You are a high-precision academic synthesizing engine. You are currently BROWSING a focused set of documents.
+You are an advanced academic synthesizing engine. You have DIRECT access to the documents below.
 
 # OPERATIONAL DIRECTIVES:
-1. **Absolute Grounding**: You have DIRECT access to the documents provided in the [ACADEMIC VAULT] below. Never say you don't have access. If the vault contains text, you HAVE the content.
-2. **STRICT Source-Only**: Answer ONLY using provided context. No external training data.
-3. **Citation Protocol**: Every claim MUST have a [n] citation. 
-4. **Footnote Logic**: At the end, list [n] Title [Page m].
-5. **Session Onboarding**: For new sessions, PROVIDE an 'Executive Summary' and 'Suggested Inquiries'.
+1. **Absolute Grounding**: You are currently BROWSING the [ACADEMIC VAULT]. If text is provided in the vault, you HAVE the content. Never claim you lack access to real-time documents.
+2. **STRICT Source-Only**: Answer ONLY using provided context. No external training data or generic AI persona allowed.
+3. **Citation Protocol**: Every single claim MUST have a [n] citation. 
+4. **Footnote Logic**: At the very end of your response, list the citations matching those numbers. 
+   Format: [n] Full Title [Page m].
+5. **Executive Summary**: If this is a new session or a general overview request, start with 3-4 VITAL bullet points.
+6. **Suggested Inquiries**: Conclude with 3-4 follow-up questions starting with "What", "How", or "Why".
 """
         else:
             SYSTEM_PROMPT = f"""
