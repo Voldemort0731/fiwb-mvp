@@ -303,12 +303,12 @@ class LMSSyncService:
                 
                 title = f"Announcement from {professor}" if professor else "Announcement"
                 
-                # Build rich content including any file/link attachments
-                content = f"Announcement from {professor} in {course_name}:\n{text}"
+                # Build rich content
+                # We only keep the raw text because the frontend now handles attachments visually
+                content = text
                 attachments = []
                 if ann_materials:
-                    mat_text, attachments = self._format_materials(ann_materials)
-                    content += f"\nAttached Materials:\n{mat_text}"
+                    _, attachments = self._format_materials(ann_materials)
                     logger.info(f"[Sync] Found {len(attachments)} attachments for announcement {item_id}")
 
                 # Index the announcement text itself
@@ -566,16 +566,15 @@ class LMSSyncService:
             return None
 
     def _format_rich_item(self, item: dict, due_date_str: str, label: str) -> tuple:
-        title = item.get('title', 'Untitled')
-        description = item.get('description', 'No description')
-        content = f"{label}: {title}\nDescription: {description}\n"
-        if due_date_str:
-            content += f"Due: {due_date_str}\n"
-        materials = item.get('materials', [])
+        # Only store the raw description in the content field, avoiding redundant prefixes or material lists.
+        # The frontend now handles attachments visually.
+        description = item.get('description', '')
+        
+        content = description
         attachments = []
+        materials = item.get('materials', [])
         if materials:
-            mat_text, attachments = self._format_materials(materials)
-            content += f"Attachments:\n{mat_text}"
+            _, attachments = self._format_materials(materials)
         return content, attachments
 
     def _format_materials(self, materials: list) -> tuple:
