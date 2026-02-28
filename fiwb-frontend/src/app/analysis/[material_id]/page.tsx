@@ -8,7 +8,7 @@ import {
     ChevronLeft, ExternalLink,
     Loader2, Copy, Check, Search,
     BookOpen, Lightbulb, MessageSquare,
-    ChevronDown, ArrowRight, RefreshCw
+    ChevronDown, ArrowRight, RefreshCw, ScanSearch
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
@@ -33,6 +33,7 @@ interface Source {
     link?: string;
     snippet?: string;
     source_type?: string;
+    material_id?: string;
 }
 
 interface Message {
@@ -107,10 +108,12 @@ function SourceCard({ source, index }: { source: Source; index: number }) {
 
 /* ─────────────── COMPONENT: Message Renderer ─────────────── */
 
-function MessageContent({ content, onCitationClick, onQuestionClick }: {
+function MessageContent({ content, onCitationClick, onQuestionClick, sources, onAnalyze }: {
     content: string;
     onCitationClick: (page: number) => void;
     onQuestionClick: (question: string) => void;
+    sources?: Source[];
+    onAnalyze?: (materialId: string) => void;
 }) {
     const suggestedQuestions = extractSuggestedQuestions(content);
 
@@ -220,6 +223,65 @@ function MessageContent({ content, onCitationClick, onQuestionClick }: {
                                 <span className="text-xs text-gray-400 group-hover:text-blue-300 transition-colors line-clamp-2">{q}</span>
                             </motion.button>
                         ))}
+                    </div>
+                </div>
+            )}
+
+            {/* GROUNDING CONTEXT (referred docs) */}
+            {sources && sources.length > 0 && (
+                <div className="mt-6 pt-6 border-t border-white/5 space-y-4">
+                    <div className="flex items-center gap-2 mb-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+                        <span className="text-[10px] font-black uppercase text-blue-500 tracking-widest">Grounding Context</span>
+                    </div>
+                    <div className="grid grid-cols-1 gap-3">
+                        {sources.map((source, idx) => {
+                            const displayTitle = source.display || source.title;
+                            return (
+                                <motion.div
+                                    key={idx}
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ delay: idx * 0.03 }}
+                                    className="group/source"
+                                >
+                                    <div className="flex flex-col p-3 rounded-2xl glass-dark border border-white/5 bg-black/40 hover:border-blue-500/40 hover:bg-blue-500/[0.02] transition-all duration-300">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <div className="p-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-500">
+                                                <FileText size={14} />
+                                            </div>
+                                        </div>
+                                        <h4 className="text-[11px] font-bold text-gray-100 line-clamp-2 mb-2 leading-tight">
+                                            {displayTitle}
+                                        </h4>
+                                        <div className="mt-auto pt-2 border-t border-white/5 flex items-center justify-between gap-4">
+                                            {source.link ? (
+                                                <a
+                                                    href={source.link}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="flex items-center gap-1.5 text-[9px] font-black text-blue-500 uppercase tracking-wider hover:text-blue-600 transition-colors"
+                                                >
+                                                    <BookOpen size={10} />
+                                                    View Original
+                                                </a>
+                                            ) : (
+                                                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Internal Context</span>
+                                            )}
+                                            {source.material_id && onAnalyze && (
+                                                <button
+                                                    onClick={() => onAnalyze(source.material_id!)}
+                                                    className="flex items-center gap-1.5 text-[9px] font-black text-emerald-400 uppercase tracking-wider hover:text-emerald-300 transition-colors cursor-pointer shrink-0"
+                                                >
+                                                    <ScanSearch size={10} />
+                                                    Analyze
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            );
+                        })}
                     </div>
                 </div>
             )}
@@ -483,6 +545,7 @@ function AnalysisBody() {
                                         updated[lastIdx] = {
                                             ...updated[lastIdx],
                                             content: assistantContent,
+                                            sources: [...msgSources],
                                             thinking: false
                                         };
                                     }
@@ -500,6 +563,7 @@ function AnalysisBody() {
                                         updated[lastIdx] = {
                                             ...updated[lastIdx],
                                             content: assistantContent,
+                                            sources: [...msgSources],
                                             thinking: false
                                         };
                                     }
@@ -519,7 +583,7 @@ function AnalysisBody() {
                     updated[lastIdx] = {
                         ...updated[lastIdx],
                         content: assistantContent,
-                        sources: msgSources,
+                        sources: [...msgSources], // Persist sources even after stream ends
                         thinking: false,
                         id: Date.now().toString()
                     };
@@ -824,8 +888,10 @@ function AnalysisBody() {
                                         ) : msg.role === "assistant" ? (
                                             <MessageContent
                                                 content={msg.content}
+                                                sources={msg.sources}
                                                 onCitationClick={navigateToPage}
                                                 onQuestionClick={(q) => sendMessage(q)}
+                                                onAnalyze={(id) => router.push(`/analysis/${id}?thread=${threadId || ""}`)}
                                             />
                                         ) : (
                                             <p className="whitespace-pre-wrap">{msg.content}</p>
