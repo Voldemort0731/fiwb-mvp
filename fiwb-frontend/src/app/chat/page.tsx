@@ -280,12 +280,26 @@ function ChatBody() {
                     } else if (line.startsWith("data: REASONING:")) {
                         accumulatedReasoning += line.replace("data: REASONING:", "");
                     } else if (line.startsWith("data: ")) {
-                        const content = line.replace("data: ", "");
-                        if (content.startsWith("EVENT:")) {
-                            setThinkingStep(content.replace("EVENT:", "").trim());
+                        const lineContent = line.replace("data: ", "").trim();
+                        if (!lineContent) continue;
+
+                        if (lineContent.startsWith("EVENT:")) {
+                            setThinkingStep(lineContent.replace("EVENT:", "").trim());
                             continue;
                         }
-                        accumulatedContent += content;
+
+                        // Parse token if JSON, else append raw
+                        try {
+                            const parsed = JSON.parse(lineContent);
+                            if (parsed.token) {
+                                accumulatedContent += parsed.token;
+                            } else {
+                                accumulatedContent += lineContent;
+                            }
+                        } catch (e) {
+                            accumulatedContent += lineContent;
+                        }
+
                         setMessages(prev => {
                             const newMsgs = [...prev];
                             const last = { ...newMsgs[newMsgs.length - 1] };
@@ -358,7 +372,14 @@ function ChatBody() {
                             </div>
                             <div className="flex-1 bg-white relative">
                                 {activeAttachment ? (
-                                    <iframe src={activeAttachment.url.replace('/view', '/preview')} className="w-full h-full border-none" />
+                                    <iframe
+                                        src={
+                                            activeAttachment.url?.includes('drive.google.com')
+                                                ? `${API_URL}/api/courses/proxy/drive/${activeAttachment.id}?user_email=${localStorage.getItem('user_email')}`
+                                                : activeAttachment.url?.replace('/view', '/preview')
+                                        }
+                                        className="w-full h-full border-none"
+                                    />
                                 ) : (
                                     <div className="h-full flex items-center justify-center p-12 text-center bg-[#0a0a0a]">
                                         <div className="max-w-md">

@@ -1,12 +1,16 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import or_
 from app.database import get_db
 from app.models import Course, User, Material
 from app.utils.email import standardize_email
+from app.lms.drive_service import DriveSyncService
+import io
 from datetime import datetime
 import json
 import logging
+import asyncio
 
 logger = logging.getLogger("uvicorn.error")
 router = APIRouter()
@@ -185,3 +189,51 @@ def get_material(material_id: str, user_email: str, db: Session = Depends(get_db
         "course_id": m.course_id,
         "source_link": m.source_link
     }
+
+@router.get("/proxy/drive/{file_id}")
+async def proxy_drive_file(file_id: str, user_email: str, db: Session = Depends(get_db)):
+    """Backend proxy to serve Google Drive files directly, bypassing iframe login issues."""
+    email = standardize_email(user_email)
+    user = db.query(User).filter(User.email == email).first()
+    if not user or not user.access_token:
+        raise HTTPException(status_code=401, detail="Unauthorized: Google credentials missing")
+
+    # Sync with DriveService logic
+    drive = DriveSyncService(user.access_token, email, user.refresh_token)
+    service = await drive._get_service()
+    
+    try:
+        # 1. Get Metadata for MimeType
+        meta = await asyncio.to_thread(service.files().get(fileId=file_id, fields="mimeType, name").execute)
+        mime_type = meta.get('mimeType', 'application/octet-stream')
+        
+        # 2. Prepare Download/Export Request
+        if 'google-apps' in mime_type:
+            # Export Google Docs to PDF for viewing
+            request = service.files().export_media(fileId=file_id, mimeType='application/pdf')
+            final_mime = 'application/pdf'
+        else:
+            request = service.files().get_media(fileId=file_id)
+            final_mime = mime_type
+
+        # 3. Stream the content
+        from googleapiclient.http import MediaIoBaseDownload
+        fh = io.BytesIO()
+        downloader = MediaIoBaseDownload(fh, request)
+        
+        async def stream_generator():
+            done = False
+            while not done:
+                status, done = await asyncio.to_thread(downloader.next_chunk)
+            
+            fh.seek(0)
+            yield fh.read()
+
+        return StreamingResponse(
+            stream_generator(), 
+            media_type=final_mime,
+            headers={"Content-Disposition": f"inline; filename={meta.get('name', 'file')}"}
+        )
+    except Exception as e:
+        logger.error(f"Proxy failed for {file_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
