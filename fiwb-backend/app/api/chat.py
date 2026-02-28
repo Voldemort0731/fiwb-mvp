@@ -11,7 +11,7 @@ import logging
 from datetime import datetime
 
 from app.database import get_db, SessionLocal
-from app.models import User, ChatThread, ChatMessage
+from app.models import User, ChatThread, ChatMessage, Material, Course
 from app.intelligence.triage_agent import classify_query
 from app.intelligence.retrieval import RetrievalOrchestrator
 from app.intelligence.prompt_architect import PromptArchitect
@@ -105,6 +105,7 @@ async def chat_stream(
     course_id: str = Form(None),
     query_type: str = Form(None),
     attachment_text: str = Form(None),
+    material_id: str = Form(None),
     db: Session = Depends(get_db)
 ):
     """Chat endpoint refactored for institutional high-concurrency scale."""
@@ -183,14 +184,57 @@ async def chat_stream(
             
             # 2. Retrieval (Skip if general chat)
             c_data = {}
+            # 2. Retrieval
             if q_type != "general_chat":
                 yield f"data: EVENT:THINKING:Searching your academic vault...\n\n"
                 c_data = await retriever.retrieve_context(message, q_type, history=short_term_history, course_filter=course_id)
             else:
                 yield f"data: EVENT:THINKING:Personalizing response...\n\n"
-                # Even for general chat, we still fetch the profile for personalization
                 c_data = await retriever.retrieve_context(message, "general_chat", history=short_term_history, course_filter=course_id)
             
+            # ENFORCE GROUNDING: If material_id provided, fetch its components
+            if material_id:
+                # 1. Main Material
+                m = db.query(Material).filter(Material.id == material_id).first()
+                if m:
+                    # Inject into retrieved course_context
+                    if m.content:
+                        c_data.setdefault("course_context", []).insert(0, {
+                            "content": m.content,
+                            "metadata": {
+                                "title": m.title,
+                                "type": m.type,
+                                "course_id": m.course_id,
+                                "id": m.id
+                            }
+                        })
+                    
+                    # 2. Attachments
+                    try:
+                        atts = json.loads(m.attachments) if m.attachments else []
+                        # Also fetch full attachment contents
+                        ids_to_fetch = []
+                        for a in atts:
+                            fid = a.get("id") or a.get("file_id")
+                            if fid:
+                                ids_to_fetch.extend([fid, f"ann_att_{fid}", f"drive_file_{fid}"])
+                        
+                        if ids_to_fetch:
+                            att_materials = db.query(Material).filter(Material.id.in_(ids_to_fetch)).all()
+                            for att_m in att_materials:
+                                if att_m.content:
+                                    c_data.setdefault("course_context", []).insert(0, {
+                                        "content": att_m.content,
+                                        "metadata": {
+                                            "title": att_m.title,
+                                            "type": "attachment",
+                                            "course_name": m.title,
+                                            "id": att_m.id
+                                        }
+                                    })
+                    except:
+                        pass
+
             # BROADCAST SOURCES (Dynamic) - ONLY if not general chat
             sources_dict = {}
             if q_type != "general_chat":

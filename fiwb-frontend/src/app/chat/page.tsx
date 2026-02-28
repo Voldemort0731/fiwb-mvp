@@ -272,7 +272,7 @@ function ChatBody() {
         }
     };
 
-    const sendMessage = async (forcedContent?: string, attachmentText?: string) => {
+    const sendMessage = async (forcedContent?: string, attachmentText?: string, targetMaterialId?: string) => {
         const contentToUse = typeof forcedContent === "string" ? forcedContent : input;
         if (!contentToUse.trim() && !selectedFile) return;
 
@@ -311,6 +311,7 @@ function ChatBody() {
             if (viewerMaterial?.course_id) formData.append("course_id", viewerMaterial.course_id);
             if (viewerMaterial) {
                 formData.append("query_type", "notebook_analysis");
+                formData.append("material_id", targetMaterialId || viewerMaterial.id);
                 // Pass material content for instant grounding
                 if (attachmentText) formData.append("attachment_text", attachmentText);
                 else if (viewerMaterial.content) formData.append("attachment_text", viewerMaterial.content);
@@ -408,7 +409,7 @@ function ChatBody() {
                         setViewerMaterial(data);
                         const firstDoc = (data.attachments || [])[0];
                         setActiveAttachment(firstDoc);
-                        sendMessage(`Analyze and summarize this: "${data.title}". Give an executive summary and suggested inquiries.`, data.content);
+                        sendMessage(`Analyze and summarize this: "${data.title}". Give an executive summary and suggested inquiries.`, data.content, data.id);
                     } catch (e) { }
                 };
                 fetchAnalysisMaterial();
