@@ -3,7 +3,7 @@ import Sidebar from "@/components/Sidebar";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useParams, useRouter } from "next/navigation";
-import { Book, Clock, ChevronRight, FileText, Youtube, Link as LinkIcon, CheckCircle2, Search, ArrowLeft, User, X, Calendar, Layers, ExternalLink, File, FileSpreadsheet, Image, Download, Eye, FileCode } from "lucide-react";
+import { Book, Clock, ChevronRight, FileText, Youtube, Link as LinkIcon, CheckCircle2, Search, ArrowLeft, User, X, Calendar, Layers, ExternalLink, File, FileSpreadsheet, Image, Download, Eye, FileCode, Paperclip, Sparkles } from "lucide-react";
 import clsx from "clsx";
 import Link from "next/link";
 import { API_URL } from "@/utils/config";
@@ -118,7 +118,10 @@ export default function CoursePage() {
             return true;
         });
 
-    const groupedContent = filteredContent.reduce((acc, item) => {
+    // Special logic for Feed tab: Do NOT group, just keep as a flat list
+    const isStream = activeTab === "stream";
+
+    const groupedContent = isStream ? { Feed: filteredContent } : filteredContent.reduce((acc, item) => {
         const type = item.type || "other";
         if (!acc[type]) acc[type] = [];
         acc[type].push(item);
@@ -227,10 +230,113 @@ export default function CoursePage() {
                                         <span className="text-[10px] font-black text-gray-600 dark:text-gray-500 uppercase tracking-[0.3em]">{(items as any[]).length} Items</span>
                                     </div>
 
-                                    <div className="grid grid-cols-1 gap-4">
+                                    <div className="grid grid-cols-1 gap-6">
                                         {(items as any[]).map((item: any, i: number) => {
                                             const Icon = item.icon;
                                             const attachmentCount = item.attachments?.length || 0;
+
+                                            // IF WE ARE IN FEED TAB, SHOW FULL CARD (Classroom Style)
+                                            if (isStream) {
+                                                return (
+                                                    <motion.div
+                                                        initial={{ opacity: 0, y: 20 }}
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        transition={{ delay: i * 0.05 }}
+                                                        key={item.id}
+                                                        className="glass-card rounded-[2rem] border border-white/5 overflow-hidden hover:border-blue-500/20 transition-all shadow-2xl shadow-black/20"
+                                                    >
+                                                        <div className="p-8">
+                                                            {/* Card Header */}
+                                                            <div className="flex items-center justify-between mb-8">
+                                                                <div className="flex items-center gap-4">
+                                                                    <div className="w-12 h-12 rounded-full bg-blue-600/10 border border-blue-500/20 flex items-center justify-center">
+                                                                        <span className="text-xl font-black text-blue-500">{(item.professor || course?.professor || "P").charAt(0)}</span>
+                                                                    </div>
+                                                                    <div>
+                                                                        <h4 className="font-black text-gray-900 dark:text-white leading-none mb-1">
+                                                                            {item.professor || course?.professor || "Unknown"}
+                                                                        </h4>
+                                                                        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-500">
+                                                                            <Clock size={10} />
+                                                                            {item.date}
+                                                                            <span className="text-blue-500">•</span>
+                                                                            {item.type}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <button
+                                                                    onClick={() => window.open(item.source_link, '_blank')}
+                                                                    className="w-10 h-10 glass-dark rounded-xl flex items-center justify-center hover:bg-white/10 transition-colors"
+                                                                >
+                                                                    <ExternalLink size={16} className="text-gray-400" />
+                                                                </button>
+                                                            </div>
+
+                                                            {/* Card Content */}
+                                                            <div className="space-y-6">
+                                                                {item.type !== 'announcement' && (
+                                                                    <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">
+                                                                        {item.title}
+                                                                    </h3>
+                                                                )}
+                                                                <div className="text-gray-800 dark:text-gray-300 font-medium leading-[1.8] whitespace-pre-wrap text-base">
+                                                                    {item.content || item.description || "No description provided."}
+                                                                </div>
+
+                                                                {/* Inline Attachments Grid */}
+                                                                {attachmentCount > 0 && (
+                                                                    <div className="pt-6 border-t border-white/5">
+                                                                        <div className="flex items-center gap-2 mb-4">
+                                                                            <Paperclip size={14} className="text-blue-500" />
+                                                                            <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">
+                                                                                Attachments ({attachmentCount})
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                                            {item.attachments.map((att: any, idx: number) => (
+                                                                                <button
+                                                                                    key={idx}
+                                                                                    onClick={() => handlePreview(att)}
+                                                                                    className="flex items-center gap-4 p-3 glass-dark hover:bg-white/10 border border-white/5 rounded-2xl transition-all text-left group/att"
+                                                                                >
+                                                                                    <div className="w-10 h-10 rounded-xl bg-black/40 flex items-center justify-center shrink-0 border border-white/5 group-hover/att:border-blue-500/30 transition-colors">
+                                                                                        {getAttachmentIcon(att.file_type || att.type)({ size: 20, className: "text-blue-400" })}
+                                                                                    </div>
+                                                                                    <div className="min-w-0 flex-1">
+                                                                                        <p className="text-xs font-black text-white truncate">{att.title}</p>
+                                                                                        <p className="text-[10px] font-black uppercase text-gray-500 tracking-wider">
+                                                                                            {getFileTypeBadge(att.file_type || att.type)}
+                                                                                        </p>
+                                                                                    </div>
+                                                                                </button>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+
+                                                                {/* Card Actions */}
+                                                                <div className="flex items-center gap-3 pt-4">
+                                                                    <button
+                                                                        onClick={() => router.push(`/chat?query=${encodeURIComponent(`Tell me about this from ${course?.name}: ${item.title}`)}`)}
+                                                                        className="px-6 py-3 glass-dark hover:bg-blue-600/10 border border-white/5 hover:border-blue-500/20 rounded-2xl text-xs font-black uppercase tracking-widest text-blue-400 transition-all flex items-center gap-2"
+                                                                    >
+                                                                        <Sparkles size={14} />
+                                                                        Analyze with AI
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => setSelectedItem(item)}
+                                                                        className="px-6 py-3 glass-dark hover:bg-white/5 border border-white/5 rounded-2xl text-xs font-black uppercase tracking-widest text-gray-400 transition-all"
+                                                                    >
+                                                                        Details
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </motion.div>
+                                                );
+                                            }
+
+                                            // IF WE ARE IN CLASSWORK/RESOURCES, USE COMPACT LIST (Legacy Style)
                                             return (
                                                 <motion.div
                                                     initial={{ opacity: 0, x: -20 }}
@@ -271,7 +377,7 @@ export default function CoursePage() {
                                                                 </>
                                                             )}
                                                             <span className="text-xs text-gray-600 font-bold">•</span>
-                                                            <span className="text-xs text-gray-900 dark:text-gray-600 font-black tracking-widest uppercase tracking-wider">{item.date}</span>
+                                                            <span className="text-xs text-gray-900 dark:text-gray-600 font-black tracking-widest uppercase tracking-higher">{item.date}</span>
                                                         </div>
                                                         <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors truncate">
                                                             {item.title}
