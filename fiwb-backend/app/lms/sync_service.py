@@ -206,13 +206,17 @@ class LMSSyncService:
                 due = self._format_date(work.get('dueDate'))
                 content, attachments = self._format_rich_item(work, due, "Assignment")
 
-                # Index to Supermemory in background (never blocks sync)
+                # Index the assignment
                 if force_reindex or item_id not in existing_local_ids:
                     asyncio.create_task(self._index_item(
                         content, title, desc, item_id, course_id, course_name, professor, "assignment", work.get('alternateLink')
                     ))
 
                 if item_id in existing_local_ids:
+                    # HEAL: If existing item is missing attachments, update it
+                    existing = db.query(Material).filter(Material.id == item_id).first()
+                    if existing and attachments and (not existing.attachments or existing.attachments == '[]'):
+                        existing.attachments = json.dumps(attachments)
                     continue
 
                 new_materials.append(Material(
@@ -220,7 +224,7 @@ class LMSSyncService:
                     user_id=user_id,
                     course_id=course_id,
                     title=title,
-                    content=desc,
+                    content=content, # Use rich content
                     type="assignment",
                     due_date=due,
                     created_at=work.get('creationTime'),
@@ -244,6 +248,10 @@ class LMSSyncService:
                     ))
 
                 if item_id in existing_local_ids:
+                    # HEAL: If existing item is missing attachments, update it
+                    existing = db.query(Material).filter(Material.id == item_id).first()
+                    if existing and attachments and (not existing.attachments or existing.attachments == '[]'):
+                        existing.attachments = json.dumps(attachments)
                     continue
 
                 new_materials.append(Material(
@@ -251,7 +259,7 @@ class LMSSyncService:
                     user_id=user_id,
                     course_id=course_id,
                     title=title,
-                    content=desc,
+                    content=content,
                     type="material",
                     due_date=None,
                     created_at=mat.get('creationTime'),
@@ -266,12 +274,14 @@ class LMSSyncService:
                 if not item_id: continue
                 
                 text = ann.get('text', '')
-                if not text: continue
-                
-                title = f"Announcement: {course_name}"
-                desc = text[:1000]
                 ann_materials = ann.get('materials', [])
 
+                # If no text AND no materials, skip
+                if not text and not ann_materials:
+                    continue
+                
+                title = f"Announcement from {professor}" if professor else "Announcement"
+                
                 # Build rich content including any file/link attachments
                 content = f"Announcement from {professor} in {course_name}:\n{text}"
                 attachments = []
@@ -282,7 +292,7 @@ class LMSSyncService:
                 # Index the announcement text itself
                 if force_reindex or item_id not in existing_local_ids:
                     asyncio.create_task(self._index_item(
-                        content, title, desc, item_id, course_id, course_name, professor, "announcement", ann.get('alternateLink')
+                        content, title, content[:1000], item_id, course_id, course_name, professor, "announcement", ann.get('alternateLink')
                     ))
 
                     # Index every Drive file attached to this announcement
@@ -292,6 +302,10 @@ class LMSSyncService:
                         ))
 
                 if item_id in existing_local_ids:
+                    # HEAL: If existing item is missing attachments, update it
+                    existing = db.query(Material).filter(Material.id == item_id).first()
+                    if existing and attachments and (not existing.attachments or existing.attachments == '[]'):
+                        existing.attachments = json.dumps(attachments)
                     continue
 
                 new_materials.append(Material(
@@ -299,7 +313,7 @@ class LMSSyncService:
                     user_id=user_id,
                     course_id=course_id,
                     title=title,
-                    content=desc,
+                    content=content, # Save richer content (full text + attachment references)
                     type="announcement",
                     due_date=None,
                     created_at=ann.get('creationTime'),
@@ -356,7 +370,7 @@ class LMSSyncService:
         Each file is downloaded, extracted (PDF/Docs/Sheets/etc.), and indexed
         into Supermemory with full course + professor context.
         """
-            import re
+        import re
         from app.lms.drive_service import DriveSyncService
         from app.utils.locks import GLOBAL_API_LOCK
 
