@@ -351,7 +351,7 @@ export default function CoursePage() {
                                                                                 query += `Please analyze this announcement and provide key takeaways.`;
                                                                             }
 
-                                                                            router.push(`/chat?query=${encodeURIComponent(query)}`);
+                                                                            router.push(`/chat?query=${encodeURIComponent(query)}&course_id=${courseId}`);
                                                                         }}
                                                                         className="px-6 py-3 glass-dark hover:bg-blue-600/10 border border-white/5 hover:border-blue-500/20 rounded-2xl text-xs font-black uppercase tracking-widest text-blue-400 transition-all flex items-center gap-2 cursor-pointer"
                                                                     >
@@ -420,6 +420,18 @@ export default function CoursePage() {
                                                     </div>
 
                                                     <div className="flex items-center gap-4">
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                const attList = (item.attachments || []).map((a: any) => `"${a.title}"`).join(', ');
+                                                                const query = `Summarize the contents and action items in the attached documents for the ${item.type} "${item.title}" in ${course?.name}: ${attList || "No attachments listed"}. Perform a deep search for these files.`;
+                                                                router.push(`/chat?query=${encodeURIComponent(query)}&course_id=${courseId}`);
+                                                            }}
+                                                            className="px-4 py-2 glass-dark hover:bg-blue-600/10 border border-white/5 hover:border-blue-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest text-blue-400 transition-all flex items-center gap-2 opacity-0 group-hover:opacity-100 cursor-pointer"
+                                                        >
+                                                            <Sparkles size={12} />
+                                                            Analyze
+                                                        </button>
                                                         <div className="w-10 h-10 rounded-full border border-white/5 flex items-center justify-center group-hover:border-blue-500/30 transition-colors">
                                                             <ChevronRight size={18} className="text-gray-600 group-hover:text-blue-400 transition-transform group-hover:translate-x-0.5" />
                                                         </div>
@@ -606,9 +618,9 @@ export default function CoursePage() {
                                         </button>
                                         <button
                                             onClick={() => {
-                                                const attList = (selectedItem.attachments || []).map((a: any) => a.title).join(', ');
-                                                const query = `Summarize this "${selectedItem.title}" from ${course?.name}. ${attList ? `Also, analyze and summarize these attached documents: ${attList}.` : ''}`;
-                                                router.push(`/chat?query=${encodeURIComponent(query)}`);
+                                                const attList = (selectedItem.attachments || []).map((a: any) => `"${a.title}"`).join(', ');
+                                                const query = `Analyze and summarize the attached documents for "${selectedItem.title}" in ${course?.name}: ${attList || "No attachments"}. Focus on pulling out action items and key information from inside the files.`;
+                                                router.push(`/chat?query=${encodeURIComponent(query)}&course_id=${courseId}`);
                                             }}
                                             className="px-6 py-3 glass-dark hover:bg-white/5 text-gray-400 hover:text-white font-bold rounded-xl transition-all border border-white/5 cursor-pointer"
                                         >

@@ -453,6 +453,10 @@ function ChatBody() {
             formData.append("history", JSON.stringify(chatHistory));
             if (currentFile) formData.append("file", currentFile);
 
+            // Pass course_id if present in URL
+            const courseId = searchParams.get("course_id");
+            if (courseId) formData.append("course_id", courseId);
+
             const response = await fetch(`${API_URL}/api/chat/stream`, { method: "POST", body: formData });
 
             if (!response.ok) {
@@ -572,10 +576,12 @@ function ChatBody() {
             setMessages([]);
             sendMessage(q);
 
-            // Clean up URL
+            // Clean up URL but preserve thread context if needed
+            // (We keep the course_id for the first message send)
             const url = new URL(window.location.href);
             url.searchParams.delete("q");
             url.searchParams.delete("query");
+            // url.searchParams.delete("course_id"); // Keep it for refreshing? No, let's keep url clean.
             window.history.replaceState({}, "", url);
         }
     }, [searchParams]);
