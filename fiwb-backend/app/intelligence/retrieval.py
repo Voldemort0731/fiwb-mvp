@@ -73,8 +73,7 @@ Rules:
 
         # Course Filters
         course_filters = [
-            {"key": "user_id", "value": self.user_email, "negate": False},
-            {"key": "type", "value": "enhanced_memory", "negate": True}
+            {"key": "user_id", "value": self.user_email, "negate": False}
         ]
         if course_filter:
             course_filters.append({"key": "course_id", "value": course_filter, "negate": False})
@@ -111,12 +110,17 @@ Rules:
         
         course_res, memory_res, assistant_res, chat_res, profile_res = results
 
-        def flatten_v3(res):
+        def flatten_v3(res, exclude_type=None):
             if not res or not isinstance(res, dict): return []
             all_chunks = []
             for doc in res.get('results', []):
                 doc_id = doc.get('documentId')
                 meta = doc.get('metadata', {})
+                
+                # Safeguard: Python-side filter for legacy documents missing "type" tags
+                if exclude_type and meta.get('type') == exclude_type:
+                    continue
+                    
                 for chunk in doc.get('chunks', []):
                     # Combine doc metadata, chunk metadata, and doc_id
                     chunk_meta = {**meta, **chunk.get('metadata', {})}
@@ -130,7 +134,7 @@ Rules:
             return all_chunks
 
         return {
-            "course_context": flatten_v3(course_res),
+            "course_context": flatten_v3(course_res, exclude_type="enhanced_memory"),
             "assistant_knowledge": flatten_v3(assistant_res),
             "chat_assets": flatten_v3(chat_res),
             "memories": flatten_v3(memory_res),
