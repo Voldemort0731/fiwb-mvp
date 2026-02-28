@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState, useRef, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
     Send, Paperclip, Cpu, Zap,
     RefreshCw, ChevronRight, X, FileText,
     Bot, User, MessageCircle, Trash2,
-    Check, BookOpen, Quote, Loader2
+    Check, BookOpen, Quote, Loader2, ScanSearch
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Sidebar from "@/components/Sidebar";
@@ -46,13 +46,15 @@ function MessageContent({
     sources,
     reasoning,
     onCitationClick,
-    onInquiryClick
+    onInquiryClick,
+    onAnalyze
 }: {
     content: string;
     sources?: any[];
     reasoning?: string;
     onCitationClick?: (pageNum: string) => void;
     onInquiryClick?: (query: string) => void;
+    onAnalyze?: (materialId: string) => void;
 }) {
     // 1. Extract Suggested Inquiries
     const inquiryRegex = /Suggested Inquiries:\n([\s\S]*?)($|\n\n)/i;
@@ -166,6 +168,15 @@ function MessageContent({
                                             ) : (
                                                 <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Internal Reference</span>
                                             )}
+                                            {source.material_id && onAnalyze && (
+                                                <button
+                                                    onClick={() => onAnalyze(source.material_id)}
+                                                    className="flex items-center gap-1.5 text-[9px] font-black text-emerald-400 uppercase tracking-wider hover:text-emerald-300 transition-colors cursor-pointer"
+                                                >
+                                                    <ScanSearch size={10} />
+                                                    Analyze
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 </motion.div>
@@ -181,6 +192,7 @@ function MessageContent({
 import { Sparkles } from "lucide-react";
 
 function ChatBody() {
+    const router = useRouter();
     const [messages, setMessages] = useState<any[]>([]);
     const [threads, setThreads] = useState<any[]>([]);
     const [activeThreadId, setActiveThreadId] = useState<string>("new");
@@ -248,8 +260,14 @@ function ChatBody() {
             window.location.href = "/";
             return;
         }
-        fetchThreads(true);
-    }, []);
+        const threadFromUrl = searchParams.get("thread");
+        if (threadFromUrl) {
+            handleThreadSelect(threadFromUrl);
+            fetchThreads(false);
+        } else {
+            fetchThreads(true);
+        }
+    }, [searchParams]);
 
     useEffect(() => {
         scrollToBottom();
@@ -513,6 +531,14 @@ function ChatBody() {
                                                 }
                                             }}
                                             onInquiryClick={(query) => sendMessage(query)}
+                                            onAnalyze={(materialId) => {
+                                                if (activeThreadId && activeThreadId !== "new") {
+                                                    router.push(`/analysis/${materialId}?thread=${activeThreadId}`);
+                                                } else {
+                                                    // If it's a new unsaved chat context, there won't be a thread ID yet
+                                                    // but typically sources only appear after a message is sent, which creates a thread
+                                                }
+                                            }}
                                         />
                                     </div>
                                 </motion.div>

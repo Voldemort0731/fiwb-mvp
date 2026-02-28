@@ -606,6 +606,15 @@ function AnalysisBody() {
                     </div>
 
                     <div className="flex items-center gap-3">
+                        {threadId && (
+                            <button
+                                onClick={() => router.push(`/chat?thread=${threadId}`)}
+                                className="px-3 py-1.5 flex items-center gap-2 border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300 hover:border-emerald-500/50 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer shadow-[0_0_15px_rgba(16,185,129,0.1)]"
+                            >
+                                <MessageSquare size={12} />
+                                Exit Split View
+                            </button>
+                        )}
                         {sources.length > 0 && (
                             <button
                                 onClick={() => setShowSources(!showSources)}

@@ -263,7 +263,8 @@ async def chat_stream(
                                 "display": f"{prefix}{full_title}",
                                 "link": meta.get("source_link") or meta.get("url") or meta.get("webViewLink") or meta.get("link"),
                                 "snippets": [item.get("content", "")],
-                                "source_type": meta.get("type", "document")
+                                "source_type": meta.get("type", "document"),
+                                "material_id": meta.get("id") or meta.get("source_id")
                             }
                         else:
                             # Append more snippets (up to 3) for more complete context
