@@ -335,7 +335,7 @@ export default function CoursePage() {
                                                                     <button
                                                                         onClick={(e) => {
                                                                             e.stopPropagation();
-                                                                            router.push(`/chat?material_id=${item.id}`);
+                                                                            router.push(`/analysis/${item.id}`);
                                                                         }}
                                                                         className="px-6 py-3 glass-dark hover:bg-blue-600/10 border border-white/5 hover:border-blue-500/20 rounded-2xl text-xs font-black uppercase tracking-widest text-blue-400 transition-all flex items-center gap-2 cursor-pointer"
                                                                     >
@@ -399,7 +399,7 @@ export default function CoursePage() {
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                router.push(`/chat?material_id=${item.id}`);
+                                                                router.push(`/analysis/${item.id}`);
                                                             }}
                                                             className="px-4 py-2 glass-dark hover:bg-blue-600/10 border border-white/5 hover:border-blue-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest text-blue-400 transition-all flex items-center gap-2 opacity-0 group-hover:opacity-100 cursor-pointer"
                                                         >
@@ -591,7 +591,7 @@ export default function CoursePage() {
                                             Open in Classroom
                                         </button>
                                         <button
-                                            onClick={() => router.push(`/chat?material_id=${selectedItem.id}`)}
+                                            onClick={() => router.push(`/analysis/${selectedItem.id}`)}
                                             className="px-6 py-3 glass-dark hover:bg-white/5 text-gray-400 hover:text-white font-bold rounded-xl transition-all border border-white/5 cursor-pointer"
                                         >
                                             Ask AI About This
