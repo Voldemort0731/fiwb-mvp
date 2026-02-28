@@ -293,23 +293,26 @@ export default function CoursePage() {
                                                                             </span>
                                                                         </div>
                                                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                                                            {item.attachments.map((att: any, idx: number) => (
-                                                                                <button
-                                                                                    key={idx}
-                                                                                    onClick={() => handlePreview(att)}
-                                                                                    className="flex items-center gap-4 p-3 glass-dark hover:bg-white/10 border border-white/5 rounded-2xl transition-all text-left group/att"
-                                                                                >
-                                                                                    <div className="w-10 h-10 rounded-xl bg-black/40 flex items-center justify-center shrink-0 border border-white/5 group-hover/att:border-blue-500/30 transition-colors">
-                                                                                        {getAttachmentIcon(att.file_type || att.type)({ size: 20, className: "text-blue-400" })}
-                                                                                    </div>
-                                                                                    <div className="min-w-0 flex-1">
-                                                                                        <p className="text-xs font-black text-white truncate">{att.title}</p>
-                                                                                        <p className="text-[10px] font-black uppercase text-gray-500 tracking-wider">
-                                                                                            {getFileTypeBadge(att.file_type || att.type)}
-                                                                                        </p>
-                                                                                    </div>
-                                                                                </button>
-                                                                            ))}
+                                                                            {(item.attachments || []).map((att: any, idx: number) => {
+                                                                                const AttachIcon = getAttachmentIcon(att.file_type || att.type);
+                                                                                return (
+                                                                                    <button
+                                                                                        key={idx}
+                                                                                        onClick={() => handlePreview(att)}
+                                                                                        className="flex items-center gap-4 p-3 glass-dark hover:bg-white/10 border border-white/5 rounded-2xl transition-all text-left group/att"
+                                                                                    >
+                                                                                        <div className="w-10 h-10 rounded-xl bg-black/40 flex items-center justify-center shrink-0 border border-white/5 group-hover/att:border-blue-500/30 transition-colors">
+                                                                                            <AttachIcon size={20} className="text-blue-400" />
+                                                                                        </div>
+                                                                                        <div className="min-w-0 flex-1">
+                                                                                            <p className="text-xs font-black text-white truncate">{att.title}</p>
+                                                                                            <p className="text-[10px] font-black uppercase text-gray-500 tracking-wider">
+                                                                                                {getFileTypeBadge(att.file_type || att.type)}
+                                                                                            </p>
+                                                                                        </div>
+                                                                                    </button>
+                                                                                );
+                                                                            })}
                                                                         </div>
                                                                     </div>
                                                                 )}
