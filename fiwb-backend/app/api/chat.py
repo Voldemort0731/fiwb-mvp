@@ -316,11 +316,23 @@ async def chat_stream(
                                     full_title = f"{base_title} [{course_name}]" if course_name else base_title
                             except: pass
 
+                        # ANALYZE LINK SYNCHRONIZATION:
+                        # If the "View Original" link is a drive link but mat_id is an announcement,
+                        # try to extract the drive ID and use it as mat_id so "Analyze" works.
+                        source_link = meta.get("source_link") or meta.get("url") or meta.get("webViewLink") or meta.get("link") or ""
+                        if ("drive.google.com" in source_link or "docs.google.com" in source_link):
+                            import re
+                            # Extract raw ID from drive URL
+                            id_match = re.search(r'([a-zA-Z0-9_-]{25,})', source_link)
+                            if id_match:
+                                raw_drive_id = id_match.group(1)
+                                mat_id = raw_drive_id # Will be resolved by resilient lookup in courses.py
+
                         if full_title not in sources_dict:
                             sources_dict[full_title] = {
                                 "title": full_title,
                                 "display": f"{prefix}{full_title}",
-                                "link": meta.get("source_link") or meta.get("url") or meta.get("webViewLink") or meta.get("link"),
+                                "link": source_link,
                                 "snippets": [item.get("content", "")],
                                 "source_type": meta.get("type", "document"),
                                 "material_id": mat_id

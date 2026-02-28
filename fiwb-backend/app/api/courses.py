@@ -174,15 +174,16 @@ def get_material(material_id: str, user_email: str, db: Session = Depends(get_db
     ).first()
 
     if not m:
-        # Try prefixes
-        prefixes = ["ann_att_", "ann_", "drive_file_"]
-        for p in prefixes:
-            if material_id.startswith(p): continue
-            m = db.query(Material).filter(
-                Material.id == f"{p}{material_id}",
-                or_(Material.user_id == user.id, Material.user_id == None)
-            ).first()
-            if m: break
+        # Resilient Lookup: Try raw id, then all known prefix variations from sync_service.py
+        search_ids = [material_id]
+        if not material_id.startswith("ann_att_"): search_ids.append(f"ann_att_{material_id}")
+        if not material_id.startswith("drive_file_"): search_ids.append(f"drive_file_{material_id}")
+        if not material_id.startswith("ann_"): search_ids.append(f"ann_{material_id}")
+        
+        m = db.query(Material).filter(
+            Material.id.in_(search_ids),
+            or_(Material.user_id == user.id, Material.user_id == None)
+        ).first()
 
     if not m:
         return {"error": "Material not found"}
