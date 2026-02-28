@@ -33,11 +33,20 @@ def get_courses(user_email: str, db: Session = Depends(get_db)):
         ).order_by(Material.created_at.desc()).first()
         
         latest_text = None
+        lat_atts = []
         if latest:
+            try:
+                lat_atts = json.loads(latest.attachments) if latest.attachments else []
+            except:
+                pass
+                
             if latest.content:
                 latest_text = f"[{latest.type.capitalize()}] {latest.content[:100]}..."
             else:
-                latest_text = f"[{latest.type.capitalize()}] {latest.title}"
+                if lat_atts and isinstance(lat_atts, list):
+                    latest_text = f"[{latest.type.capitalize()}] 📎 {lat_atts[0].get('title', 'Attachment')}"
+                else:
+                    latest_text = f"[{latest.type.capitalize()}] {latest.title}"
 
         results.append({
             "id": c.id,
@@ -45,7 +54,8 @@ def get_courses(user_email: str, db: Session = Depends(get_db)):
             "professor": c.professor or "Unknown",
             "platform": c.platform,
             "last_synced": c.last_synced.isoformat() if c.last_synced else None,
-            "latest_update": latest_text
+            "latest_update": latest_text,
+            "latest_attachment_count": len(lat_atts) if isinstance(lat_atts, list) else 0
         })
         
     return results

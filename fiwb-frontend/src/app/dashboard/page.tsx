@@ -405,9 +405,17 @@ export default function Dashboard() {
                                                     <span className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">{course.platform}</span>
                                                 </div>
                                                 {course.latest_update && (
-                                                    <p className="text-[11px] text-gray-500 font-medium truncate mt-1">
-                                                        {course.latest_update}
-                                                    </p>
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <p className="text-[11px] text-gray-500 font-medium truncate">
+                                                            {course.latest_update}
+                                                        </p>
+                                                        {course.latest_attachment_count > 0 && (
+                                                            <div className="flex items-center gap-1 text-[10px] text-blue-500 font-bold bg-blue-500/10 px-1.5 py-0.5 rounded flex-shrink-0">
+                                                                <FileText size={10} />
+                                                                <span>{course.latest_attachment_count}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 )}
                                             </div>
                                             <ChevronRight size={14} className="text-gray-300 group-hover:text-blue-500 transition-all translate-x-0 group-hover:translate-x-1" />
