@@ -103,6 +103,7 @@ async def chat_stream(
     history: str = Form(None), 
     file: UploadFile = File(None),
     course_id: str = Form(None),
+    query_type: str = Form(None),
     db: Session = Depends(get_db)
 ):
     """Chat endpoint refactored for institutional high-concurrency scale."""
@@ -172,7 +173,9 @@ async def chat_stream(
 
             # 1. Classification first to decide if we need retrieval
             yield f"data: EVENT:THINKING:Classifying intent...\n\n"
-            q_type = await classify_query(message, attachment_base64)
+            q_type_classified = await classify_query(message, attachment_base64)
+            # 4. Neural Orchestration (RAG)
+            q_type = query_type or q_type_classified # Use user-provided query_type if available, else use classified
             
             # 2. Retrieval (Skip if general chat)
             c_data = {}

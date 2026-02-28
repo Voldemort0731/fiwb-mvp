@@ -415,9 +415,7 @@ export default function CoursePage() {
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                const attList = (item.attachments || []).map((a: any) => `"${a.title}"`).join(', ');
-                                                                const query = `Summarize the contents and action items in the attached documents for the ${item.type} "${item.title}" in ${course?.name}: ${attList || "No attachments listed"}. Perform a deep search for these files.`;
-                                                                router.push(`/chat?query=${encodeURIComponent(query)}&course_id=${courseId}`);
+                                                                router.push(`/analysis/${item.id}`);
                                                             }}
                                                             className="px-4 py-2 glass-dark hover:bg-blue-600/10 border border-white/5 hover:border-blue-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest text-blue-400 transition-all flex items-center gap-2 opacity-0 group-hover:opacity-100 cursor-pointer"
                                                         >
@@ -609,11 +607,7 @@ export default function CoursePage() {
                                             Open in Classroom
                                         </button>
                                         <button
-                                            onClick={() => {
-                                                const attList = (selectedItem.attachments || []).map((a: any) => `"${a.title}"`).join(', ');
-                                                const query = `Analyze and summarize the attached documents for "${selectedItem.title}" in ${course?.name}: ${attList || "No attachments"}. Focus on pulling out action items and key information from inside the files.`;
-                                                router.push(`/chat?query=${encodeURIComponent(query)}&course_id=${courseId}`);
-                                            }}
+                                            onClick={() => router.push(`/analysis/${selectedItem.id}`)}
                                             className="px-6 py-3 glass-dark hover:bg-white/5 text-gray-400 hover:text-white font-bold rounded-xl transition-all border border-white/5 cursor-pointer"
                                         >
                                             Ask AI About This
@@ -658,6 +652,6 @@ export default function CoursePage() {
                     )}
                 </AnimatePresence>
             </main>
-        </div>
+        </div >
     );
 }

@@ -206,7 +206,11 @@ class DriveSyncService:
                 
                 if mime_type == 'application/pdf':
                     pdf_reader = pypdf.PdfReader(io.BytesIO(fh.getvalue()))
-                    return "\n".join([page.extract_text() for page in pdf_reader.pages])
+                    pages = []
+                    for i, page in enumerate(pdf_reader.pages):
+                        text = page.extract_text()
+                        pages.append(f"--- [PAGE {i+1}] ---\n{text}")
+                    return "\n\n".join(pages)
                 
                 return fh.getvalue().decode('utf-8', errors='ignore')
             except:

@@ -154,3 +154,34 @@ def get_course_materials(course_id: str, user_email: str, db: Session = Depends(
         })
 
     return results
+
+@router.get("/material/{material_id}")
+def get_material(material_id: str, user_email: str, db: Session = Depends(get_db)):
+    """Fetch details for a specific classwork material/assignment."""
+    email = standardize_email(user_email)
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        return {"error": "User not found"}
+
+    m = db.query(Material).filter(
+        Material.id == material_id,
+        or_(Material.user_id == user.id, Material.user_id == None)
+    ).first()
+    
+    if not m:
+        return {"error": "Material not found"}
+
+    try:
+        atts = json.loads(m.attachments) if m.attachments else []
+    except:
+        atts = []
+
+    return {
+        "id": m.id,
+        "title": m.title,
+        "type": m.type,
+        "content": m.content or "",
+        "attachments": atts,
+        "course_id": m.course_id,
+        "source_link": m.source_link
+    }
