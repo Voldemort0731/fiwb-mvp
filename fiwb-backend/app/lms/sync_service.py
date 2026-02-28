@@ -213,10 +213,19 @@ class LMSSyncService:
                     ))
 
                 if item_id in existing_local_ids:
-                    # HEAL: If existing item is missing attachments, update it
+                    # HEAL: If existing item is missing attachments or has old content style, update it
                     existing = db.query(Material).filter(Material.id == item_id).first()
-                    if existing and attachments and (not existing.attachments or existing.attachments == '[]'):
-                        existing.attachments = json.dumps(attachments)
+                    if existing:
+                        updated = False
+                        if attachments and (not existing.attachments or existing.attachments == '[]'):
+                            existing.attachments = json.dumps(attachments)
+                            updated = True
+                        if existing.content != content:
+                            existing.content = content
+                            updated = True
+                        if updated:
+                            db.commit()
+                            logger.info(f"[Sync] HEALED assignment: {title}")
                     continue
 
                 new_materials.append(Material(
@@ -248,10 +257,19 @@ class LMSSyncService:
                     ))
 
                 if item_id in existing_local_ids:
-                    # HEAL: If existing item is missing attachments, update it
+                    # HEAL: If existing item is missing attachments or has old content style, update it
                     existing = db.query(Material).filter(Material.id == item_id).first()
-                    if existing and attachments and (not existing.attachments or existing.attachments == '[]'):
-                        existing.attachments = json.dumps(attachments)
+                    if existing:
+                        updated = False
+                        if attachments and (not existing.attachments or existing.attachments == '[]'):
+                            existing.attachments = json.dumps(attachments)
+                            updated = True
+                        if existing.content != content:
+                            existing.content = content
+                            updated = True
+                        if updated:
+                            db.commit()
+                            logger.info(f"[Sync] HEALED material: {title}")
                     continue
 
                 new_materials.append(Material(
@@ -275,6 +293,9 @@ class LMSSyncService:
                 
                 text = ann.get('text', '')
                 ann_materials = ann.get('materials', [])
+                
+                # LOGGING: Help us debug exactly what Classroom is sending
+                logger.info(f"[Sync] Processing announcement {item_id}. Text: {len(text)} chars. Materials: {len(ann_materials)}")
 
                 # If no text AND no materials, skip
                 if not text and not ann_materials:
@@ -288,6 +309,7 @@ class LMSSyncService:
                 if ann_materials:
                     mat_text, attachments = self._format_materials(ann_materials)
                     content += f"\nAttached Materials:\n{mat_text}"
+                    logger.info(f"[Sync] Found {len(attachments)} attachments for announcement {item_id}")
 
                 # Index the announcement text itself
                 if force_reindex or item_id not in existing_local_ids:
@@ -302,10 +324,22 @@ class LMSSyncService:
                         ))
 
                 if item_id in existing_local_ids:
-                    # HEAL: If existing item is missing attachments, update it
+                    # HEAL: If existing item is missing attachments or has old content style, update it
                     existing = db.query(Material).filter(Material.id == item_id).first()
-                    if existing and attachments and (not existing.attachments or existing.attachments == '[]'):
-                        existing.attachments = json.dumps(attachments)
+                    if existing:
+                        updated = False
+                        if attachments and (not existing.attachments or existing.attachments == '[]'):
+                            existing.attachments = json.dumps(attachments)
+                            updated = True
+                        if existing.content != content:
+                            existing.content = content
+                            updated = True
+                        if existing.title != title:
+                            existing.title = title
+                            updated = True
+                        if updated:
+                            db.commit()
+                            logger.info(f"[Sync] HEALED announcement for {course_name}")
                     continue
 
                 new_materials.append(Material(
