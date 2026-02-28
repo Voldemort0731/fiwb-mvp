@@ -200,15 +200,21 @@ async def chat_stream(
                 logger.info(f"[Chat] Focused retrieval active for material: {material_id}")
             # ENFORCE GROUNDING: If material_id provided, fetch its components
             if material_id:
-                # 1. Main Material
+                # 1. Main Material (Resilient ID Lookup)
                 m = db.query(Material).filter(Material.id == material_id).first()
+                if not m:
+                    for p in ["ann_att_", "ann_", "drive_file_"]:
+                        if material_id.startswith(p): continue
+                        m = db.query(Material).filter(Material.id == f"{p}{material_id}").first()
+                        if m: break
+
                 if m:
                     # Inject into retrieved course_context
                     if m.content:
                         c_data.setdefault("course_context", []).insert(0, {
                             "content": m.content,
                             "metadata": {
-                                "title": m.title,
+                                "title": m.title or "Institutional Document",
                                 "type": m.type,
                                 "course_id": m.course_id,
                                 "id": m.id
@@ -286,13 +292,34 @@ async def chat_stream(
                                         
                                         # 3. Fallback to broad search if needed
                                         if not found_att:
+                                            # Try all known prefix patterns
+                                            prefixes = ["ann_att_", "drive_file_", ""]
+                                            for p in prefixes:
+                                                search_id = f"{p}{ann_id}"
+                                                child_att = db.query(Material).filter(Material.id == search_id).first()
+                                                if child_att:
+                                                    mat_id = child_att.id
+                                                    found_att = True
+                                                    break
+                                        
+                                        # 4. Final last-resort: link/content search
+                                        if not found_att:
                                             child_att = db.query(Material).filter(
-                                                (Material.id.like(f"%{ann_id}%")) | (Material.source_link.like(f"%{ann_id}%")),
-                                                Material.type.in_(["drive_file", "attachment"])
+                                                (Material.source_link.like(f"%{ann_id}%")),
+                                                Material.type.in_(["drive_file", "attachment", "announcement_drive_attachment"])
                                             ).first()
                                             if child_att:
                                                 mat_id = child_att.id
                                     except: pass
+
+                        # RECOVERY: If title is generic/missing, try to find it in the local DB
+                        if not meta.get('title') or meta.get('title') == "Institutional Document":
+                            try:
+                                db_m_lookup = db.query(Material).filter(Material.id == mat_id).first()
+                                if db_m_lookup:
+                                    base_title = db_m_lookup.title
+                                    full_title = f"{base_title} [{course_name}]" if course_name else base_title
+                            except: pass
 
                         if full_title not in sources_dict:
                             sources_dict[full_title] = {

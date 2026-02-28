@@ -167,11 +167,23 @@ def get_material(material_id: str, user_email: str, db: Session = Depends(get_db
     if not user:
         return {"error": "User not found"}
 
+    # Resilient ID Lookup: tries raw id, then prefixed variants
     m = db.query(Material).filter(
         Material.id == material_id,
         or_(Material.user_id == user.id, Material.user_id == None)
     ).first()
-    
+
+    if not m:
+        # Try prefixes
+        prefixes = ["ann_att_", "ann_", "drive_file_"]
+        for p in prefixes:
+            if material_id.startswith(p): continue
+            m = db.query(Material).filter(
+                Material.id == f"{p}{material_id}",
+                or_(Material.user_id == user.id, Material.user_id == None)
+            ).first()
+            if m: break
+
     if not m:
         return {"error": "Material not found"}
 
@@ -195,8 +207,19 @@ def get_material(material_id: str, user_email: str, db: Session = Depends(get_db
                 "type": a.get("type", "drive_file"),
                 "file_type": "pdf" if "pdf" in mime.lower() or title.lower().endswith(".pdf") else "document"
             })
-    except:
+    except Exception:
         atts = []
+
+    # RECOVERY: If it is a drive_file but attachments failed to load, synthesize the entry
+    if not atts and m.type in ["drive_file", "announcement_drive_attachment", "assignment", "material"]:
+        if m.source_link and ("drive.google.com" in m.source_link or "docs.google.com" in m.source_link):
+            atts.append({
+                "id": m.id,
+                "title": m.title or "PDF Handout",
+                "url": m.source_link,
+                "type": "drive_file",
+                "file_type": "pdf" if (".pdf" in (m.title or "").lower()) else "document"
+            })
 
     return {
         "id": m.id,
