@@ -315,7 +315,9 @@ async def chat_stream(
         except Exception as e:
             logger.error(f"Critical System Stream Failure: {e}", exc_info=True)
             # Avoid backslashes in f-strings for Python <3.12 compatibility
-            json_err = json.dumps({'token': '\n\n[Neural Link Reset]: The system encountered a capacity issue. Please refresh.'})
+            # We use a clear version label to verify deploy: [RELOAD_v2]
+            err_msg_text = '\n\n[Neural Link RESET_v2]: The system encountered a capacity issue. Please REFRESH/RESTART the analysis session.'
+            json_err = json.dumps({'token': err_msg_text})
             yield f"data: {json_err}\n\n"
 
     return StreamingResponse(generate(), media_type="text/event-stream")

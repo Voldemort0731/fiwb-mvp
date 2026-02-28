@@ -92,15 +92,18 @@ Rules:
         # Profile Filters
         profile_filters = [{"key": "user_id", "value": self.user_email, "negate": False}, {"key": "type", "value": "user_profile", "negate": False}]
 
-        # Focused search if material_id is provided
-        # Handle announcements (parent-child relationship)
-        ann_id_only = material_id.replace("ann_", "") if material_id and material_id.startswith("ann_") else None
-        
-        or_conditions = [{"key": "source_id", "value": material_id, "negate": False}]
-        if ann_id_only:
-            or_conditions.append({"key": "parent_announcement_id", "value": ann_id_only, "negate": False})
+        # Focused search (Direct Material + Attachments)
+        focused_filters = []
+        if material_id:
+            focused_filters.append({"key": "user_id", "value": self.user_email, "negate": False})
             
-        focused_filters = {"OR": or_conditions} if material_id else None
+            # Handle announcements (parent-child relationship)
+            ann_id_only = material_id.replace("ann_", "") if material_id.startswith("ann_") else None
+            or_conditions = [{"key": "source_id", "value": material_id, "negate": False}]
+            if ann_id_only:
+                or_conditions.append({"key": "parent_announcement_id", "value": ann_id_only, "negate": False})
+            
+            focused_filters.append({"OR": or_conditions})
 
         # 2. Parallel Search Execution
         UsageTracker.log_sm_request(self.user_email) # Log once for the batch
@@ -108,10 +111,10 @@ Rules:
         tasks = [
             # Course search
             self.sm_client.search(query=search_query, filters={"AND": course_filters}, limit=15) if query_type != "general_chat" else asyncio.sleep(0, result={}),
-            # Focused search (Direct Material + Attachments)
+            # Focused search (Direct Material + Attachments) 
             self.sm_client.search(
                 query=search_query, 
-                filters={"AND": [{"key": "user_id", "value": self.user_email, "negate": False}], **(focused_filters if focused_filters else {})}, 
+                filters={"AND": focused_filters}, 
                 limit=25
             ) if material_id else asyncio.sleep(0, result={}),
             # Memory search
