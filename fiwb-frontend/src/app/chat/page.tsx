@@ -252,7 +252,7 @@ function ChatBody() {
         }
     };
 
-    const fetchThreads = async (shouldSelectLatest = false) => {
+    const fetchThreads = async (shouldSelectLatest = false, threadIdFromUrl?: string | null, materialIdFromUrl?: string | null) => {
         const rawEmail = localStorage.getItem("user_email");
         const email = standardize_email(rawEmail);
         if (!email) return;
@@ -260,7 +260,7 @@ function ChatBody() {
             const res = await fetch(`${API_URL}/api/chat/threads?user_email=${email}`);
             const data = await res.json();
             setThreads(data);
-            if (shouldSelectLatest && data.length > 0 && activeThreadId === "new") {
+            if (shouldSelectLatest && data.length > 0 && activeThreadId === "new" && !threadIdFromUrl && !materialIdFromUrl && !searchParams.get("q")) {
                 handleThreadSelect(data[0].id);
             }
         } catch (e) {
@@ -292,7 +292,7 @@ function ChatBody() {
             window.location.href = "/";
             return;
         }
-        fetchThreads(true);
+        fetchThreads(true, searchParams.get("thread_id"), searchParams.get("material_id"));
     }, []);
 
     useEffect(() => {
@@ -305,6 +305,7 @@ function ChatBody() {
 
         const materialId = localStorage.getItem(`analysis_thread_${id}`);
         if (materialId) {
+            window.history.pushState(null, '', `/chat?material_id=${materialId}&thread_id=${id}`);
             const email = standardize_email(localStorage.getItem("user_email"));
             try {
                 const res = await fetch(`${API_URL}/api/courses/material/${materialId}?user_email=${email}`);
@@ -321,6 +322,7 @@ function ChatBody() {
                 setActiveAttachment(firstDoc);
             } catch (e) { console.error("Could not fetch associated material:", e); }
         } else {
+            window.history.pushState(null, '', `/chat?thread_id=${id}`);
             setViewerMaterial(null);
             setActiveAttachment(null);
         }
@@ -408,8 +410,12 @@ function ChatBody() {
                         const newId = line.replace("data: THREAD_ID:", "").trim();
                         setActiveThreadId(newId);
                         fetchThreads();
-                        if (viewerMaterial?.id) {
-                            localStorage.setItem(`analysis_thread_${newId}`, viewerMaterial.id as string);
+                        const materialId = targetMaterialId || viewerMaterial?.id;
+                        if (materialId) {
+                            localStorage.setItem(`analysis_thread_${newId}`, materialId as string);
+                            window.history.replaceState(null, '', `/chat?material_id=${materialId}&thread_id=${newId}`);
+                        } else {
+                            window.history.replaceState(null, '', `/chat?thread_id=${newId}`);
                         }
                     } else if (line.startsWith("data: SOURCE:")) {
                         try {
@@ -461,28 +467,38 @@ function ChatBody() {
     };
 
     useEffect(() => {
+        if (initializedRef.current) return;
+        initializedRef.current = true;
+
         const q = searchParams.get("q") || searchParams.get("query");
         const materialId = searchParams.get("material_id");
+        const threadId = searchParams.get("thread_id");
 
-        if (!initializedRef.current) {
-            if (q) {
-                initializedRef.current = true;
-                sendMessage(q);
-            } else if (materialId) {
-                initializedRef.current = true;
-                const fetchAnalysisMaterial = async () => {
-                    const email = standardize_email(localStorage.getItem("user_email"));
-                    try {
-                        const res = await fetch(`${API_URL}/api/courses/material/${materialId}?user_email=${email}`);
-                        const data = await res.json();
-                        setViewerMaterial(data);
-                        const firstDoc = (data.attachments || [])[0];
-                        setActiveAttachment(firstDoc);
+        if (q) {
+            sendMessage(q);
+        } else if (materialId) {
+            const fetchAnalysisMaterial = async () => {
+                const email = standardize_email(localStorage.getItem("user_email"));
+                try {
+                    const res = await fetch(`${API_URL}/api/courses/material/${materialId}?user_email=${email}`);
+                    const data = await res.json();
+                    setViewerMaterial(data);
+                    const firstDoc = (data.attachments || [])[0];
+                    setActiveAttachment(firstDoc);
+
+                    if (threadId) {
+                        // Link is coming with an active thread - fetch history, DO NOT trigger summary
+                        setActiveThreadId(threadId);
+                        fetchMessages(threadId);
+                    } else {
+                        // Link is entirely new analysis
                         sendMessage(`Analyze and summarize this: "${data.title}". Give an executive summary and suggested inquiries.`, data.content, data.id);
-                    } catch (e) { }
-                };
-                fetchAnalysisMaterial();
-            }
+                    }
+                } catch (e) { }
+            };
+            fetchAnalysisMaterial();
+        } else if (threadId) {
+            handleThreadSelect(threadId);
         }
     }, [searchParams]);
 
