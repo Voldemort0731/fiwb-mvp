@@ -67,8 +67,10 @@ function MessageContent({
     let mainContent = content.replace(inquiryRegex, '').trim();
 
     // Remove internal system tags that leak into the UI
-    mainContent = mainContent.replace(/\[PERSONAL_REASONING:[\s\S]*?\]\n*/gi, '').trim();
-    mainContent = mainContent.replace(/\[DOCUMENTS_REFERENCED:[\s\S]*?\]\n*/gi, '').trim();
+    mainContent = mainContent.replace(/\[PERSONAL_REASONING:[\s\S]*?\]\n*/gi, '');
+    mainContent = mainContent.replace(/\[DOCUMENTS_REFERENCED:[\s\S]*?\]\n*/gi, '');
+    mainContent = mainContent.replace(/\[ANALYSIS_REASONING:[\s\S]*?\]\n*/gi, '');
+    mainContent = mainContent.trim();
 
     // Heuristic for citation to page mapping
     // AI usually lists citations at the end: [1] Title [Page 5]
@@ -103,7 +105,9 @@ function MessageContent({
                             if (text.startsWith('[') && text.endsWith(']')) {
                                 const num = text.replace(/[\[\]]/g, '');
                                 if (!isNaN(Number(num))) {
-                                    return <Citation num={num} onClick={() => onCitationClick?.(pageMap[num] || '1')} />;
+                                    // Use the mapped page number if it exists, otherwise use the citation number itself as the page
+                                    const page = pageMap[num] || num;
+                                    return <Citation num={num} onClick={() => onCitationClick?.(page)} />;
                                 }
                             }
                             return <strong>{children}</strong>;
@@ -375,7 +379,16 @@ function ChatBody() {
                         const lineContent = line.replace("data: ", "").trim();
                         if (!lineContent) continue;
 
-                        if (lineContent.startsWith("EVENT:")) {
+                        if (lineContent.startsWith("EVENT:THINKING:")) {
+                            setThinkingStep(lineContent.replace("EVENT:THINKING:", "").trim());
+                            continue;
+                        } else if (lineContent.startsWith("EVENT:SOURCES:")) {
+                            try {
+                                const parsedSources = JSON.parse(lineContent.replace("EVENT:SOURCES:", ""));
+                                accumulatedSources = parsedSources;
+                            } catch (e) { }
+                            continue;
+                        } else if (lineContent.startsWith("EVENT:")) {
                             setThinkingStep(lineContent.replace("EVENT:", "").trim());
                             continue;
                         }
