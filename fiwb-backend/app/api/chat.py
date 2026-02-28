@@ -200,24 +200,26 @@ async def chat_stream(
                 logger.info(f"[Chat] Focused retrieval active for material: {material_id}")
             # ENFORCE GROUNDING: If material_id provided, fetch its components
             if material_id:
-                # 1. Main Material (Resilient ID Lookup)
+                # 1. Main Material (Self-healing lookup)
                 m = db.query(Material).filter(Material.id == material_id).first()
                 if not m:
-                    for p in ["ann_att_", "ann_", "drive_file_"]:
-                        if material_id.startswith(p): continue
-                        m = db.query(Material).filter(Material.id == f"{p}{material_id}").first()
-                        if m: break
+                    # Try prefixed variants (announcement attachments, drive files)
+                    prefixed = [f"ann_att_{material_id}", f"drive_file_{material_id}", f"ann_{material_id}"]
+                    m = db.query(Material).filter(Material.id.in_(prefixed)).first()
+                if not m:
+                    # Final fallback: Look for ID inside source links
+                    m = db.query(Material).filter(Material.source_link.like(f"%{material_id}%")).first()
 
                 if m:
-                    # Inject into retrieved course_context
                     if m.content:
                         c_data.setdefault("course_context", []).insert(0, {
                             "content": m.content,
                             "metadata": {
-                                "title": m.title or "Institutional Document",
+                                "title": m.title,
                                 "type": m.type,
                                 "course_id": m.course_id,
-                                "id": m.id
+                                "id": m.id,
+                                "source_link": m.source_link
                             }
                         })
                     
@@ -280,59 +282,31 @@ async def chat_stream(
                                 # 2. Check DB for focused attachment materials (Authoritative)
                                 if not found_att:
                                     try:
-                                        # Search for materials whose parent project is this announcement
-                                        child_att = db.query(Material).filter(
-                                            (Material.id.like(f"%{ann_id}%")) | (Material.source_link.like(f"%{ann_id}%")),
-                                            Material.type.in_(["drive_file", "attachment", "announcement_drive_attachment"])
-                                        ).first()
-                                        if child_att:
-                                            mat_id = child_att.id
-                                            found_att = True
+                                        m_record = db.query(Material).filter(Material.id == ann_id).first()
+                                        if m_record and m_record.attachments:
+                                            try:
+                                                atts = json.loads(m_record.attachments)
+                                                if atts and len(atts) > 0:
+                                                    first_att = atts[0]
+                                                    mat_id = first_att.get("id") or first_att.get("file_id") or first_att.get("fid") # check all variants
+                                                    found_att = True
+                                            except: pass
                                         
-                                        # 3. If no child record, check parent attachments JSON
+                                        # 3. Fallback to broad search if needed
                                         if not found_att:
-                                            m_record = db.query(Material).filter(Material.id == ann_id).first()
-                                            if m_record and m_record.attachments:
-                                                try:
-                                                    atts_json = json.loads(m_record.attachments)
-                                                    if atts_json:
-                                                        # Use the first drive file's ID
-                                                        for a in atts_json:
-                                                            df = a.get("driveFile", {}).get("driveFile", {}) if "driveFile" in a else a
-                                                            fid = df.get("id") or df.get("file_id") or a.get("id")
-                                                            if fid:
-                                                                mat_id = fid # Resilient lookup in courses.py will handle the rest
-                                                                found_att = True
-                                                                break
-                                                except: pass
+                                            child_att = db.query(Material).filter(
+                                                (Material.id.like(f"%{ann_id}%")) | (Material.source_link.like(f"%{ann_id}%")),
+                                                Material.type.in_(["drive_file", "attachment"])
+                                            ).first()
+                                            if child_att:
+                                                mat_id = child_att.id
                                     except: pass
-
-                        # RECOVERY: If title is generic/missing, try to find it in the local DB
-                        if not meta.get('title') or meta.get('title') == "Institutional Document":
-                            try:
-                                db_m_lookup = db.query(Material).filter(Material.id == mat_id).first()
-                                if db_m_lookup:
-                                    base_title = db_m_lookup.title
-                                    full_title = f"{base_title} [{course_name}]" if course_name else base_title
-                            except: pass
-
-                        # ANALYZE LINK SYNCHRONIZATION:
-                        # If the "View Original" link is a drive link but mat_id is an announcement,
-                        # try to extract the drive ID and use it as mat_id so "Analyze" works.
-                        source_link = meta.get("source_link") or meta.get("url") or meta.get("webViewLink") or meta.get("link") or ""
-                        if ("drive.google.com" in source_link or "docs.google.com" in source_link):
-                            import re
-                            # Extract raw ID from drive URL
-                            id_match = re.search(r'([a-zA-Z0-9_-]{25,})', source_link)
-                            if id_match:
-                                raw_drive_id = id_match.group(1)
-                                mat_id = raw_drive_id # Will be resolved by resilient lookup in courses.py
 
                         if full_title not in sources_dict:
                             sources_dict[full_title] = {
                                 "title": full_title,
                                 "display": f"{prefix}{full_title}",
-                                "link": source_link,
+                                "link": meta.get("source_link") or meta.get("url") or meta.get("webViewLink") or meta.get("link"),
                                 "snippets": [item.get("content", "")],
                                 "source_type": meta.get("type", "document"),
                                 "material_id": mat_id

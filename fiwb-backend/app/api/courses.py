@@ -167,26 +167,26 @@ def get_material(material_id: str, user_email: str, db: Session = Depends(get_db
     if not user:
         return {"error": "User not found"}
 
-    # Resilient ID Lookup: tries raw id, then prefixed variants
+    # SELF-HEALING ID RESOLUTION (Resolve direct IDs, prefixed IDs, or URLs)
     m = db.query(Material).filter(
         Material.id == material_id,
         or_(Material.user_id == user.id, Material.user_id == None)
     ).first()
 
     if not m:
-        # Resilient Lookup: Try raw id, then all known prefix variations from sync_service.py
-        search_ids = [material_id]
-        if not material_id.startswith("ann_att_"): search_ids.append(f"ann_att_{material_id}")
-        if not material_id.startswith("drive_file_"): search_ids.append(f"drive_file_{material_id}")
-        if not material_id.startswith("ann_"): search_ids.append(f"ann_{material_id}")
-        
+        # 1. Check for prefixed variants
+        prefixed = [f"ann_att_{material_id}", f"drive_file_{material_id}", f"ann_{material_id}"]
         m = db.query(Material).filter(
-            Material.id.in_(search_ids),
+            Material.id.in_(prefixed),
             or_(Material.user_id == user.id, Material.user_id == None)
         ).first()
-
+    
     if not m:
-        return {"error": "Material not found"}
+        # 2. Check source_link if the ID is just a raw Google Drive ID or URL
+        m = db.query(Material).filter(
+            Material.source_link.like(f"%{material_id}%"),
+            or_(Material.user_id == user.id, Material.user_id == None)
+        ).first()
 
     try:
         raw_atts = json.loads(m.attachments) if m.attachments else []
@@ -208,26 +208,8 @@ def get_material(material_id: str, user_email: str, db: Session = Depends(get_db
                 "type": a.get("type", "drive_file"),
                 "file_type": "pdf" if "pdf" in mime.lower() or title.lower().endswith(".pdf") else "document"
             })
-    except Exception:
+    except:
         atts = []
-
-    # RECOVERY: If it is a drive_file/announcement but attachments failed to load, synthesize the entry
-    if not atts:
-        link = m.source_link or ""
-        # Expand recovery to include 'announcement' type
-        if m.type in ["drive_file", "announcement"] and ("drive.google.com" in link or "docs.google.com" in link):
-            # Extract raw ID from link for the proxy
-            import re
-            file_id_match = re.search(r'([a-zA-Z0-9_-]{25,})', link)
-            raw_id = file_id_match.group(1) if file_id_match else m.id
-            
-            atts.append({
-                "id": raw_id,
-                "title": m.title or "PDF Handout",
-                "url": link,
-                "type": "drive_file", # Ensure type is "drive_file" for synthesized attachments
-                "file_type": "pdf" if (".pdf" in (m.title or "").lower() or "pdf" in (m.content or "").lower()) else "document"
-            })
 
     return {
         "id": m.id,

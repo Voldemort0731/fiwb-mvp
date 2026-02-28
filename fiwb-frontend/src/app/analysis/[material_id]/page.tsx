@@ -392,16 +392,14 @@ function AnalysisBody() {
                     a.alternateLink?.includes('drive.google.com')
                 ) || attachments[0];
 
-                // RECOVERY: If NO attachment found but source_link is a drive link, synthesize one
+                // VIRTUAL ATTACHMENT: If no attachment record exists but we have a Drive source link, use it!
                 if (!firstDoc && data.source_link?.includes('drive.google.com')) {
-                    const fileIdMatch = data.source_link.match(/\/d\/([a-zA-Z0-9_-]{25,})/);
-                    const fid = fileIdMatch ? fileIdMatch[1] : data.id;
                     firstDoc = {
-                        id: fid,
-                        title: data.title || "PDF Document",
+                        id: data.id,
+                        title: data.title,
                         url: data.source_link,
-                        type: "drive_file",
-                        file_type: "pdf"
+                        type: 'drive_file',
+                        file_type: 'pdf'
                     };
                 }
 
@@ -446,15 +444,19 @@ function AnalysisBody() {
     // Initial analysis trigger (runs once after material loads, ONLY for new sessions)
     useEffect(() => {
         if (!material || hasInitialized.current || messages.length > 0) return;
+
+        // Wait until we have an active attachment or it's confirmed text-only
+        if (!activeAttachment && material_id && !material.content) return;
+
         hasInitialized.current = true;
 
         const docName = activeAttachment ? activeAttachment.title : material.title;
         const initQuery = `Analyze and summarize this "${docName}". Give an executive summary and suggested inquiries.`;
 
-        // IMPORTANT: If we have an attachment (PDF), we don't pass the material text
-        // because the backend will fetch the authoritative text for activeAttachment.id
+        // IMPORTANT: We use the active attachment's ID to focus the AI's "Neural Link" on the document content 
+        // rather than just the announcement/metadata text.
         sendMessage(initQuery);
-    }, [material, activeAttachment]);
+    }, [material, activeAttachment, material_id]);
 
     // Copy message content
     const copyMessage = useCallback((content: string, id: string) => {
