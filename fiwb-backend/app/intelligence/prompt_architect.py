@@ -23,6 +23,18 @@ class PromptArchitect:
         # 1. ORCHESTRATE ACADEMIC CONTEXT (Grouped by Document)
         context_blocks = []
         docs = {}
+        
+        # Inject immediate attachment text if provided (e.g., Analysis mode)
+        if attachment_text:
+            docs["CURRENT_DOCUMENT"] = {
+                "title": "Currently Viewed Document",
+                "course": "Analysis Workspace",
+                "category": "PRIMARY SOURCE",
+                "author": "Academic Faculty",
+                "link": None,
+                "chunks": [attachment_text]
+            }
+
         for c in retrieved_chunks:
             meta = c.get('metadata', {})
             # Use unique file identifiers to prevent merging different materials
@@ -179,8 +191,7 @@ You are an elite academic mentor and Socratic tutor.
 
         # 7. ATTACH THE LATEST QUERY WITH ASSETS
         final_query_content = []
-        if attachment_text:
-            final_query_content.append({"type": "text", "text": f"[ATTACHED ASSET CONTENT]:\n{attachment_text}"})
+        # Pulled attachment_text into knowledge_base above for better grounding
         
         if base64_image:
             final_query_content.append({

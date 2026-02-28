@@ -104,6 +104,7 @@ async def chat_stream(
     file: UploadFile = File(None),
     course_id: str = Form(None),
     query_type: str = Form(None),
+    attachment_text: str = Form(None),
     db: Session = Depends(get_db)
 ):
     """Chat endpoint refactored for institutional high-concurrency scale."""
@@ -124,9 +125,10 @@ async def chat_stream(
             thread = ChatThread(id=thread_id, user_id=user.id, title=message[:40])
             db.add(thread)
 
-    attachment_text, attachment_base64 = None, None
+    attachment_base64 = None
     file_name, file_type = None, None
 
+    # Handle file upload if present
     if file:
         file_name = file.filename
         file_type = file.content_type
@@ -135,7 +137,9 @@ async def chat_stream(
             base64_img = base64.b64encode(raw_content).decode("utf-8")
             attachment_base64 = f"data:{file_type};base64,{base64_img}"
         else:
+            # If a file is uploaded, its text content takes precedence over the form field
             attachment_text = await extract_text_from_file_threaded(file)
+            # Only add to Supermemory if it's a new file upload, not just text passed via form
             sm = SharedClients.get_supermemory()
             background_tasks.add_task(
                 sm.add_document, 

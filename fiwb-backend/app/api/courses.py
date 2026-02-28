@@ -176,7 +176,17 @@ def get_material(material_id: str, user_email: str, db: Session = Depends(get_db
         return {"error": "Material not found"}
 
     try:
-        atts = json.loads(m.attachments) if m.attachments else []
+        raw_atts = json.loads(m.attachments) if m.attachments else []
+        # Normalize: ensure id exists even if it's file_id
+        atts = []
+        for a in raw_atts:
+            atts.append({
+                "id": a.get("id") or a.get("file_id"),
+                "title": a.get("title") or "Attachment",
+                "url": a.get("url") or a.get("alternateLink"),
+                "type": a.get("type") or a.get("type"),
+                "file_type": a.get("file_type") or ("pdf" if "pdf" in (a.get("mime_type") or "").lower() else "document")
+            })
     except:
         atts = []
 
@@ -184,7 +194,7 @@ def get_material(material_id: str, user_email: str, db: Session = Depends(get_db
         "id": m.id,
         "title": m.title,
         "type": m.type,
-        "content": m.content or "",
+        "content": m.content or m.title,
         "attachments": atts,
         "course_id": m.course_id,
         "source_link": m.source_link

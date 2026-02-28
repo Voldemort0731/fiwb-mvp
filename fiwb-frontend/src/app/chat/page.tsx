@@ -208,7 +208,7 @@ function ChatBody() {
         }
     };
 
-    const sendMessage = async (forcedContent?: string) => {
+    const sendMessage = async (forcedContent?: string, attachmentText?: string) => {
         const contentToUse = typeof forcedContent === "string" ? forcedContent : input;
         if (!contentToUse.trim() && !selectedFile) return;
 
@@ -245,7 +245,12 @@ function ChatBody() {
             formData.append("user_email", email);
             formData.append("thread_id", activeThreadId);
             if (viewerMaterial?.course_id) formData.append("course_id", viewerMaterial.course_id);
-            if (viewerMaterial) formData.append("query_type", "notebook_analysis");
+            if (viewerMaterial) {
+                formData.append("query_type", "notebook_analysis");
+                // Pass material content for instant grounding
+                if (attachmentText) formData.append("attachment_text", attachmentText);
+                else if (viewerMaterial.content) formData.append("attachment_text", viewerMaterial.content);
+            }
 
             const response = await fetch(`${API_URL}/api/chat/stream`, {
                 method: "POST",
@@ -339,7 +344,7 @@ function ChatBody() {
                         setViewerMaterial(data);
                         const firstDoc = (data.attachments || [])[0];
                         setActiveAttachment(firstDoc);
-                        sendMessage(`Analyze and summarize this: "${data.title}". Give an executive summary and suggested inquiries.`);
+                        sendMessage(`Analyze and summarize this: "${data.title}". Give an executive summary and suggested inquiries.`, data.content);
                     } catch (e) { }
                 };
                 fetchAnalysisMaterial();
@@ -374,7 +379,7 @@ function ChatBody() {
                                 {activeAttachment ? (
                                     <iframe
                                         src={
-                                            activeAttachment.url?.includes('drive.google.com')
+                                            (activeAttachment.url?.includes('drive.google.com') || activeAttachment.type === 'drive')
                                                 ? `${API_URL}/api/courses/proxy/drive/${activeAttachment.id}?user_email=${localStorage.getItem('user_email')}`
                                                 : activeAttachment.url?.replace('/view', '/preview')
                                         }
