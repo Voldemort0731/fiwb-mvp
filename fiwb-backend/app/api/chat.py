@@ -55,7 +55,8 @@ async def list_threads(user_email: str, db: Session = Depends(get_db)):
     return [{
         "id": t.id,
         "title": t.title,
-        "updated_at": t.updated_at
+        "updated_at": t.updated_at,
+        "material_id": t.material_id
     } for t in threads]
 
 @router.get("/threads/{thread_id}/messages")
@@ -116,15 +117,18 @@ async def chat_stream(
         raise HTTPException(status_code=404, detail="User registration required.")
         
     # 1. Atomic Thread Logic
+    # Resolve material_id for analysis threads
+    mat_id = material_id if query_type == "notebook_analysis" else None
+
     if thread_id == "new":
         thread_id = str(uuid.uuid4())
-        thread = ChatThread(id=thread_id, user_id=user.id, title=message[:40])
+        thread = ChatThread(id=thread_id, user_id=user.id, title=message[:40], material_id=mat_id)
         db.add(thread)
     else:
         thread = db.query(ChatThread).filter(ChatThread.id == thread_id).first()
         if not thread:
             thread_id = str(uuid.uuid4())
-            thread = ChatThread(id=thread_id, user_id=user.id, title=message[:40])
+            thread = ChatThread(id=thread_id, user_id=user.id, title=message[:40], material_id=mat_id)
             db.add(thread)
 
     attachment_base64 = None

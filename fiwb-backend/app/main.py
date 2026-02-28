@@ -78,6 +78,22 @@ async def on_startup():
         # Offload sync DB creation to a thread to avoid blocking the whole app startup
         await asyncio.to_thread(Base.metadata.create_all, bind=engine)
         logger.info("✅ Institutional Infrastructure Ready (Database Connected)")
+
+        # Safe migrations — add columns that may not exist yet
+        from sqlalchemy import text
+        migrations = [
+            "ALTER TABLE chat_threads ADD COLUMN material_id VARCHAR",
+        ]
+        def run_migrations():
+            with engine.connect() as conn:
+                for sql in migrations:
+                    try:
+                        conn.execute(text(sql))
+                        conn.commit()
+                        logger.info(f"Migration applied: {sql}")
+                    except Exception:
+                        conn.rollback()  # Column already exists, skip
+        await asyncio.to_thread(run_migrations)
     except Exception as e:
         logger.error(f"❌ Database initialization error: {e}")
 

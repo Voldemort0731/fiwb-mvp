@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, MessageSquareText, Settings, LogOut, ChevronRight, Plus, MessageCircle, Trash2, TrendingUp, Mail, Cloud } from "lucide-react";
+import { LayoutDashboard, MessageSquareText, Settings, LogOut, ChevronRight, Plus, MessageCircle, Trash2, TrendingUp, Mail, Cloud, BookOpen } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import DriveSyncModal from "@/components/DriveSyncModal";
 import clsx from "clsx";
@@ -46,6 +46,8 @@ export default function Sidebar({ threads = [], activeThreadId, onThreadSelect, 
     const isOwner = email === OWNER_EMAIL;
 
     const isChatPage = pathname === "/chat";
+    const isAnalysisPage = pathname?.startsWith("/analysis");
+    const showThreads = isChatPage || isAnalysisPage;
 
     return (
         <div className="flex flex-col h-full w-72 bg-white dark:bg-[#050505] border-r border-gray-200 dark:border-white/5 text-gray-700 dark:text-gray-400 p-6 flex-shrink-0 relative overflow-hidden bg-dot-pattern transition-colors duration-500">
@@ -115,37 +117,51 @@ export default function Sidebar({ threads = [], activeThreadId, onThreadSelect, 
                     </div>
                 </section>
 
-                {isChatPage && threads.length > 0 && (
+                {showThreads && threads.length > 0 && (
                     <section className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
                         <p className="text-[10px] font-bold text-gray-500 dark:text-gray-600 uppercase tracking-[0.2em] mb-4 px-3">Recent Chats</p>
                         <div className="space-y-1">
                             <AnimatePresence>
-                                {threads.map((thread) => (
-                                    <motion.div
-                                        initial={{ opacity: 0, x: -10 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        exit={{ opacity: 0, x: -10 }}
-                                        key={thread.id}
-                                        className={clsx(
-                                            "group flex items-center justify-between p-3 rounded-xl transition-all duration-300 cursor-pointer border",
-                                            activeThreadId === thread.id
-                                                ? "glass-card text-gray-900 dark:text-white border-blue-500/20 shadow-lg"
-                                                : "hover:bg-gray-100 dark:hover:bg-white/5 text-gray-500 dark:text-gray-400 border-transparent"
-                                        )}
-                                        onClick={() => onThreadSelect?.(thread.id)}
-                                    >
-                                        <div className="flex items-center gap-3 min-w-0 pr-2">
-                                            <MessageCircle size={14} className={activeThreadId === thread.id ? "text-blue-500" : "text-gray-400 dark:text-gray-600"} />
-                                            <span className="text-xs font-semibold truncate tracking-tight">{thread.title || "New Session"}</span>
-                                        </div>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); onDeleteThread?.(thread.id); }}
-                                            className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/10 hover:text-red-500 rounded-lg transition-all"
+                                {threads.map((thread) => {
+                                    const isAnalysis = !!thread.material_id;
+                                    const ThreadIcon = isAnalysis ? BookOpen : MessageCircle;
+                                    return (
+                                        <motion.div
+                                            initial={{ opacity: 0, x: -10 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            exit={{ opacity: 0, x: -10 }}
+                                            key={thread.id}
+                                            className={clsx(
+                                                "group flex items-center justify-between p-3 rounded-xl transition-all duration-300 cursor-pointer border",
+                                                activeThreadId === thread.id
+                                                    ? "glass-card text-gray-900 dark:text-white border-blue-500/20 shadow-lg"
+                                                    : "hover:bg-gray-100 dark:hover:bg-white/5 text-gray-500 dark:text-gray-400 border-transparent"
+                                            )}
+                                            onClick={() => {
+                                                if (isAnalysis) {
+                                                    window.location.href = `/analysis/${thread.material_id}?thread=${thread.id}`;
+                                                } else {
+                                                    onThreadSelect?.(thread.id);
+                                                }
+                                            }}
                                         >
-                                            <Trash2 size={12} />
-                                        </button>
-                                    </motion.div>
-                                ))}
+                                            <div className="flex items-center gap-3 min-w-0 pr-2">
+                                                <ThreadIcon size={14} className={clsx(
+                                                    activeThreadId === thread.id ? "text-blue-500" : "text-gray-400 dark:text-gray-600",
+                                                    isAnalysis && "text-emerald-500"
+                                                )} />
+                                                <span className="text-xs font-semibold truncate tracking-tight">{thread.title || "New Session"}</span>
+                                                {isAnalysis && <span className="text-[8px] px-1.5 py-0.5 bg-emerald-500/10 text-emerald-400 rounded font-black uppercase tracking-widest shrink-0">Doc</span>}
+                                            </div>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); onDeleteThread?.(thread.id); }}
+                                                className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/10 hover:text-red-500 rounded-lg transition-all"
+                                            >
+                                                <Trash2 size={12} />
+                                            </button>
+                                        </motion.div>
+                                    );
+                                })}
                             </AnimatePresence>
                         </div>
                     </section>

@@ -30,34 +30,11 @@ const fileToBase64 = (file: File): Promise<string> => {
     });
 };
 
-import React from "react";
-import { ArrowRight, Lightbulb } from "lucide-react";
-
-function extractSuggestedQuestions(content: string): string[] {
-    const questions: string[] = [];
-    const patterns = [
-        /\d+\.\s*"([^"]+\??)"/g,
-        /\d+\.\s*"([^"]+)"/g,
-        /[-•]\s*"([^"]+\??)"/g,
-    ];
-    for (const pattern of patterns) {
-        let match;
-        while ((match = pattern.exec(content)) !== null) {
-            const q = match[1].trim();
-            if (q.length > 10 && q.length < 200 && !questions.includes(q)) {
-                questions.push(q);
-            }
-        }
-    }
-    return questions.slice(0, 5);
-}
-
-function CitationButton({ num, onClick }: { num: number, onClick: () => void }) {
+function Citation({ num, onClick }: { num: string; onClick?: () => void }) {
     return (
         <button
             onClick={onClick}
-            className="inline-flex items-center justify-center w-5 h-5 mx-0.5 text-[9px] font-black bg-blue-500/20 text-blue-400 rounded-full hover:bg-blue-500/40 hover:text-blue-300 transition-all cursor-pointer border border-blue-500/30 hover:border-blue-400/50 align-super leading-none"
-            title={`Jump to source [${num}]`}
+            className="inline-flex items-center justify-center w-5 h-5 ml-1 -mt-1 text-[10px] font-black text-white bg-blue-600 rounded-full hover:bg-blue-500 hover:scale-110 active:scale-95 transition-all shadow-[0_0_8px_rgba(59,130,246,0.3)] border border-blue-400/20 align-middle select-none cursor-pointer"
         >
             {num}
         </button>
@@ -74,36 +51,27 @@ function MessageContent({
     content: string;
     sources?: any[];
     reasoning?: string;
-    onCitationClick?: (page: number) => void;
+    onCitationClick?: (pageNum: string) => void;
     onInquiryClick?: (query: string) => void;
 }) {
-    const suggestedQuestions = extractSuggestedQuestions(content);
+    // 1. Extract Suggested Inquiries
+    const inquiryRegex = /Suggested Inquiries:\n([\s\S]*?)($|\n\n)/i;
+    const inquiryMatch = content.match(inquiryRegex);
+    const inquiries = inquiryMatch
+        ? inquiryMatch[1].split('\n').map(line => line.replace(/^[•\-\*]\s*/, '').trim()).filter(Boolean)
+        : [];
 
-    let cleanContent = content;
-    const splitTokens = ["**💡 Dive Deeper:**", "💡 Dive Deeper:", "**Suggested Questions", "Suggested Questions:", "💡 Suggested Questions"];
-    for (const token of splitTokens) {
-        if (cleanContent.includes(token)) {
-            cleanContent = cleanContent.split(token)[0].trimEnd();
-            break;
-        }
+    // Remove the inquiries block from main content for cleaner markdown view
+    const mainContent = content.replace(inquiryRegex, '').trim();
+
+    // Heuristic for citation to page mapping
+    // AI usually lists citations at the end: [1] Title [Page 5]
+    const pageMap: Record<string, string> = {};
+    const pageMatchRegex = /\[(\d+)\]\s+.*?\s+\[Page\s+(\d+)\]/g;
+    let match;
+    while ((match = pageMatchRegex.exec(content)) !== null) {
+        pageMap[match[1]] = match[2];
     }
-
-    const processChildren = (kids: React.ReactNode): React.ReactNode => {
-        return React.Children.map(kids, (child) => {
-            if (typeof child !== 'string') return child;
-
-            const parts = child.split(/\[(\d+)\]/g);
-            if (parts.length === 1) return child;
-
-            return parts.map((part, i) => {
-                if (i % 2 === 1) {
-                    const num = parseInt(part);
-                    return <CitationButton key={i} num={num} onClick={() => onCitationClick?.(num)} />;
-                }
-                return part;
-            });
-        });
-    };
 
     return (
         <div className="space-y-4">
@@ -117,52 +85,41 @@ function MessageContent({
                 </div>
             )}
 
-            <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={{
-                    p: ({ children }) => <p className="mb-3 last:mb-0 leading-relaxed text-sm font-medium text-gray-200">{processChildren(children)}</p>,
-                    h1: ({ children }) => <h1 className="text-lg font-black text-white mt-4 mb-2">{children}</h1>,
-                    h2: ({ children }) => <h2 className="text-base font-black text-white mt-4 mb-2">{children}</h2>,
-                    h3: ({ children }) => <h3 className="text-sm font-black text-white mt-3 mb-1.5">{children}</h3>,
-                    ul: ({ children }) => <ul className="list-disc ml-5 mb-3 space-y-1.5">{children}</ul>,
-                    ol: ({ children }) => <ol className="list-decimal ml-5 mb-3 space-y-1.5">{children}</ol>,
-                    li: ({ children }) => <li className="text-gray-300 pl-1 marker:text-gray-500 text-sm">{processChildren(children)}</li>,
-                    strong: ({ children }) => <strong className="text-white font-bold">{children}</strong>,
-                    em: ({ children }) => <em className="text-blue-300 italic">{children}</em>,
-                    code: ({ className, children }) => {
-                        const isInline = !className;
-                        if (isInline) return <code className="bg-white/10 text-emerald-400 px-1.5 py-0.5 rounded text-xs font-mono">{children}</code>;
-                        return <code className="block bg-[#0d0d0d] border border-white/5 rounded-xl p-4 my-3 text-xs font-mono text-gray-300 overflow-x-auto">{children}</code>;
-                    },
-                    pre: ({ children }) => <pre className="bg-[#0d0d0d] border border-white/5 rounded-xl p-4 my-3 text-xs font-mono text-gray-300 overflow-x-auto">{children}</pre>,
-                    blockquote: ({ children }) => (
-                        <blockquote className="border-l-2 border-blue-500/50 pl-4 my-3 text-gray-400 italic bg-blue-500/5 py-2 pr-4 rounded-r-lg">
-                            {children}
-                        </blockquote>
-                    ),
-                    table: ({ children }) => (
-                        <div className="overflow-x-auto my-3">
-                            <table className="w-full text-xs border-collapse">{children}</table>
-                        </div>
-                    ),
-                    thead: ({ children }) => <thead className="bg-white/5">{children}</thead>,
-                    th: ({ children }) => <th className="text-left p-2 text-gray-300 font-bold border-b border-white/10">{children}</th>,
-                    td: ({ children }) => <td className="p-2 text-gray-400 border-b border-white/5">{children}</td>,
-                }}
-            >
-                {cleanContent}
-            </ReactMarkdown>
+            <div className="prose prose-invert max-w-none text-sm font-medium leading-relaxed">
+                <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                        p: ({ children }) => <p className="mb-4 last:mb-0">{children}</p>,
+                        ul: ({ children }) => <ul className="list-disc ml-4 mb-4 space-y-2">{children}</ul>,
+                        // Custom renderer for citations
+                        strong: ({ children }) => {
+                            const text = String(children);
+                            if (text.startsWith('[') && text.endsWith(']')) {
+                                const num = text.replace(/[\[\]]/g, '');
+                                if (!isNaN(Number(num))) {
+                                    return <Citation num={num} onClick={() => onCitationClick?.(pageMap[num] || '1')} />;
+                                }
+                            }
+                            return <strong>{children}</strong>;
+                        }
+                    }}
+                >
+                    {/* Convert [1] into **[1]** so ReactMarkdown component can pick it up via 'strong' override */}
+                    {mainContent.replace(/\[(\d+)\]/g, ' **[$1]** ')}
+                </ReactMarkdown>
+            </div>
 
-            {suggestedQuestions.length > 0 && (
+            {/* Interactive Inquiries */}
+            {inquiries.length > 0 && (
                 <div className="mt-4 flex flex-wrap gap-2 animate-in fade-in slide-in-from-bottom-2 duration-700">
-                    {suggestedQuestions.map((q, idx) => (
+                    {inquiries.map((inquiry, idx) => (
                         <button
                             key={idx}
-                            onClick={() => onInquiryClick?.(q)}
+                            onClick={() => onInquiryClick?.(inquiry)}
                             className="px-4 py-2 glass-dark hover:bg-blue-600/20 border border-white/5 hover:border-blue-500/30 rounded-xl text-[11px] font-bold text-blue-400 transition-all flex items-center gap-2 group cursor-pointer"
                         >
-                            <Lightbulb size={12} className="opacity-50 group-hover:opacity-100" />
-                            {q}
+                            <Sparkles size={12} className="opacity-50 group-hover:opacity-100" />
+                            {inquiry}
                         </button>
                     ))}
                 </div>
@@ -221,7 +178,6 @@ function MessageContent({
     );
 }
 
-
 import { Sparkles } from "lucide-react";
 
 function ChatBody() {
@@ -252,7 +208,7 @@ function ChatBody() {
         }
     };
 
-    const fetchThreads = async (shouldSelectLatest = false, threadIdFromUrl?: string | null, materialIdFromUrl?: string | null) => {
+    const fetchThreads = async (shouldSelectLatest = false) => {
         const rawEmail = localStorage.getItem("user_email");
         const email = standardize_email(rawEmail);
         if (!email) return;
@@ -260,7 +216,7 @@ function ChatBody() {
             const res = await fetch(`${API_URL}/api/chat/threads?user_email=${email}`);
             const data = await res.json();
             setThreads(data);
-            if (shouldSelectLatest && data.length > 0 && activeThreadId === "new" && !threadIdFromUrl && !materialIdFromUrl && !searchParams.get("q")) {
+            if (shouldSelectLatest && data.length > 0 && activeThreadId === "new") {
                 handleThreadSelect(data[0].id);
             }
         } catch (e) {
@@ -292,40 +248,16 @@ function ChatBody() {
             window.location.href = "/";
             return;
         }
-        fetchThreads(true, searchParams.get("thread_id"), searchParams.get("material_id"));
+        fetchThreads(true);
     }, []);
 
     useEffect(() => {
         scrollToBottom();
     }, [messages]);
 
-    const handleThreadSelect = async (id: string) => {
+    const handleThreadSelect = (id: string) => {
         setActiveThreadId(id);
         fetchMessages(id);
-
-        const materialId = localStorage.getItem(`analysis_thread_${id}`);
-        if (materialId) {
-            window.history.pushState(null, '', `/chat?material_id=${materialId}&thread_id=${id}`);
-            const email = standardize_email(localStorage.getItem("user_email"));
-            try {
-                const res = await fetch(`${API_URL}/api/courses/material/${materialId}?user_email=${email}`);
-                const data = await res.json();
-                setViewerMaterial(data);
-
-                const attachments = data.attachments || [];
-                const firstDoc = attachments.find((a: any) =>
-                    a.title?.toLowerCase().endsWith('.pdf') ||
-                    a.type === 'drive_file' ||
-                    a.file_type === 'pdf'
-                ) || attachments[0];
-
-                setActiveAttachment(firstDoc);
-            } catch (e) { console.error("Could not fetch associated material:", e); }
-        } else {
-            window.history.pushState(null, '', `/chat?thread_id=${id}`);
-            setViewerMaterial(null);
-            setActiveAttachment(null);
-        }
     };
 
     const handleDeleteThread = async (id: string) => {
@@ -410,13 +342,6 @@ function ChatBody() {
                         const newId = line.replace("data: THREAD_ID:", "").trim();
                         setActiveThreadId(newId);
                         fetchThreads();
-                        const materialId = targetMaterialId || viewerMaterial?.id;
-                        if (materialId) {
-                            localStorage.setItem(`analysis_thread_${newId}`, materialId as string);
-                            window.history.replaceState(null, '', `/chat?material_id=${materialId}&thread_id=${newId}`);
-                        } else {
-                            window.history.replaceState(null, '', `/chat?thread_id=${newId}`);
-                        }
                     } else if (line.startsWith("data: SOURCE:")) {
                         try {
                             const sourceData = JSON.parse(line.replace("data: SOURCE:", ""));
@@ -467,38 +392,28 @@ function ChatBody() {
     };
 
     useEffect(() => {
-        if (initializedRef.current) return;
-        initializedRef.current = true;
-
         const q = searchParams.get("q") || searchParams.get("query");
         const materialId = searchParams.get("material_id");
-        const threadId = searchParams.get("thread_id");
 
-        if (q) {
-            sendMessage(q);
-        } else if (materialId) {
-            const fetchAnalysisMaterial = async () => {
-                const email = standardize_email(localStorage.getItem("user_email"));
-                try {
-                    const res = await fetch(`${API_URL}/api/courses/material/${materialId}?user_email=${email}`);
-                    const data = await res.json();
-                    setViewerMaterial(data);
-                    const firstDoc = (data.attachments || [])[0];
-                    setActiveAttachment(firstDoc);
-
-                    if (threadId) {
-                        // Link is coming with an active thread - fetch history, DO NOT trigger summary
-                        setActiveThreadId(threadId);
-                        fetchMessages(threadId);
-                    } else {
-                        // Link is entirely new analysis
+        if (!initializedRef.current) {
+            if (q) {
+                initializedRef.current = true;
+                sendMessage(q);
+            } else if (materialId) {
+                initializedRef.current = true;
+                const fetchAnalysisMaterial = async () => {
+                    const email = standardize_email(localStorage.getItem("user_email"));
+                    try {
+                        const res = await fetch(`${API_URL}/api/courses/material/${materialId}?user_email=${email}`);
+                        const data = await res.json();
+                        setViewerMaterial(data);
+                        const firstDoc = (data.attachments || [])[0];
+                        setActiveAttachment(firstDoc);
                         sendMessage(`Analyze and summarize this: "${data.title}". Give an executive summary and suggested inquiries.`, data.content, data.id);
-                    }
-                } catch (e) { }
-            };
-            fetchAnalysisMaterial();
-        } else if (threadId) {
-            handleThreadSelect(threadId);
+                    } catch (e) { }
+                };
+                fetchAnalysisMaterial();
+            }
         }
     }, [searchParams]);
 
@@ -580,19 +495,20 @@ function ChatBody() {
                                             reasoning={msg.reasoning}
                                             onCitationClick={(page) => {
                                                 if (activeAttachment && iframeRef.current) {
-                                                    const isDrive = activeAttachment.url?.includes('drive.google.com') || activeAttachment.type === 'drive';
-                                                    const targetUrl = isDrive
+                                                    const baseUrl = (activeAttachment.url?.includes('drive.google.com') || activeAttachment.type === 'drive')
                                                         ? `${API_URL}/api/courses/proxy/drive/${activeAttachment.id}?user_email=${localStorage.getItem('user_email')}`
                                                         : activeAttachment.url?.replace('/view', '/preview');
 
-                                                    if (!targetUrl) return;
-
-                                                    const finalUrl = `${targetUrl}#page=${page}`;
-
-                                                    if (iframeRef.current.src.split('#')[0] === finalUrl.split('#')[0]) {
-                                                        iframeRef.current.src = `${targetUrl}&_t=${Date.now()}#page=${page}`;
-                                                    } else {
-                                                        iframeRef.current.src = finalUrl;
+                                                    try {
+                                                        // Use absolute URL for URL constructor
+                                                        const absoluteBase = baseUrl.startsWith('http') ? baseUrl : window.location.origin + baseUrl;
+                                                        const url = new URL(absoluteBase);
+                                                        url.searchParams.set('page', page);
+                                                        iframeRef.current.src = url.toString();
+                                                    } catch (err) {
+                                                        // Fallback for simple string concat if URL construction fails
+                                                        const separator = baseUrl.includes('?') ? '&' : '?';
+                                                        iframeRef.current.src = `${baseUrl}${separator}page=${page}`;
                                                     }
                                                 }
                                             }}

@@ -77,6 +77,7 @@ class ChatThread(Base):
     id = Column(String, primary_key=True, index=True) # UUID string
     user_id = Column(Integer, ForeignKey("users.id"), index=True)
     title = Column(String)
+    material_id = Column(String, nullable=True, index=True) # Links to source doc for analysis threads
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
