@@ -257,10 +257,13 @@ function AnalysisBody() {
     const [activeAttachment, setActiveAttachment] = useState<Attachment | null>(null);
 
     // Chat State
+    const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const queryThreadId = searchParams?.get('thread_id');
+
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
     const [streaming, setStreaming] = useState(false);
-    const [threadId, setThreadId] = useState<string | null>(null);
+    const [threadId, setThreadId] = useState<string | null>(queryThreadId || null);
     const [thinkingStep, setThinkingStep] = useState("");
     const [sources, setSources] = useState<Source[]>([]);
     const [showSources, setShowSources] = useState(false);
@@ -278,6 +281,48 @@ function AnalysisBody() {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
     }, [messages, streaming]);
+
+    // Fetch history if thread_id is in URL
+    useEffect(() => {
+        if (!queryThreadId || !userEmail) return;
+
+        const fetchHistory = async () => {
+            try {
+                // Prevent duplicate initialization summary
+                hasInitialized.current = true;
+                setLoading(true);
+
+                const res = await fetch(`${API_URL}/api/chat/history/${queryThreadId}?user_email=${userEmail}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.length > 0) {
+                        const formattedMessages = data.map((msg: any) => ({
+                            role: msg.role,
+                            content: msg.content,
+                            id: msg.id.toString(),
+                            attachmentUrl: msg.attachment
+                        }));
+                        setMessages(formattedMessages);
+
+                        // Set sources from the last assistant message
+                        const lastAssistantMsg = data.reverse().find((m: any) => m.role === 'assistant');
+                        if (lastAssistantMsg && lastAssistantMsg.sources) {
+                            try {
+                                setSources(JSON.parse(lastAssistantMsg.sources));
+                            } catch (e) { }
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error("Failed to load chat history:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchHistory();
+    }, [queryThreadId, userEmail]);
+
 
     // Fetch material data
     useEffect(() => {
@@ -406,6 +451,9 @@ function AnalysisBody() {
                     if (payload.startsWith("THREAD_ID:")) {
                         const newId = payload.replace("THREAD_ID:", "").trim();
                         setThreadId(newId);
+                        // Persist in URL and localStorage so we can resume
+                        window.history.replaceState(null, '', `/analysis/${material_id}?thread_id=${newId}`);
+                        localStorage.setItem(`analysis_thread_${newId}`, material_id as string);
                     } else if (payload.startsWith("EVENT:THINKING:")) {
                         setThinkingStep(payload.replace("EVENT:THINKING:", ""));
                     } else if (payload.startsWith("EVENT:SOURCES:")) {

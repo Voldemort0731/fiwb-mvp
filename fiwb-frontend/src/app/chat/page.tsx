@@ -256,6 +256,11 @@ function ChatBody() {
     }, [messages]);
 
     const handleThreadSelect = (id: string) => {
+        const materialId = localStorage.getItem(`analysis_thread_${id}`);
+        if (materialId) {
+            window.location.href = `/analysis/${materialId}?thread_id=${id}`;
+            return;
+        }
         setActiveThreadId(id);
         fetchMessages(id);
     };
