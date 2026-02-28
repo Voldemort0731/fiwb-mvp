@@ -30,14 +30,48 @@ const fileToBase64 = (file: File): Promise<string> => {
     });
 };
 
-function MessageContent({ content, sources, reasoning }: { content: string, sources?: any[], reasoning?: string }) {
-    // Parse numerical citations [1], [2]...
-    const docCitations = content.match(/\[(\d+)\]/g)?.map(c => {
-        const num = c.replace(/[\[\]]/g, '');
-        // Find corresponding source title if it exists in the reasoning or content
-        // This is a heuristic - in a real app, the LLM should return structured metadata
-        return { num, baseTitle: `Source ${num}`, pages: "" };
-    }) || [];
+function Citation({ num, onClick }: { num: string; onClick?: () => void }) {
+    return (
+        <button
+            onClick={onClick}
+            className="inline-flex items-center justify-center w-5 h-5 ml-1 -mt-1 text-[10px] font-black text-white bg-blue-600 rounded-full hover:bg-blue-500 hover:scale-110 active:scale-95 transition-all shadow-[0_0_8px_rgba(59,130,246,0.3)] border border-blue-400/20 align-middle select-none cursor-pointer"
+        >
+            {num}
+        </button>
+    );
+}
+
+function MessageContent({
+    content,
+    sources,
+    reasoning,
+    onCitationClick,
+    onInquiryClick
+}: {
+    content: string;
+    sources?: any[];
+    reasoning?: string;
+    onCitationClick?: (pageNum: string) => void;
+    onInquiryClick?: (query: string) => void;
+}) {
+    // 1. Extract Suggested Inquiries
+    const inquiryRegex = /Suggested Inquiries:\n([\s\S]*?)($|\n\n)/i;
+    const inquiryMatch = content.match(inquiryRegex);
+    const inquiries = inquiryMatch
+        ? inquiryMatch[1].split('\n').map(line => line.replace(/^[•\-\*]\s*/, '').trim()).filter(Boolean)
+        : [];
+
+    // Remove the inquiries block from main content for cleaner markdown view
+    const mainContent = content.replace(inquiryRegex, '').trim();
+
+    // Heuristic for citation to page mapping
+    // AI usually lists citations at the end: [1] Title [Page 5]
+    const pageMap: Record<string, string> = {};
+    const pageMatchRegex = /\[(\d+)\]\s+.*?\s+\[Page\s+(\d+)\]/g;
+    let match;
+    while ((match = pageMatchRegex.exec(content)) !== null) {
+        pageMap[match[1]] = match[2];
+    }
 
     return (
         <div className="space-y-4">
@@ -57,11 +91,39 @@ function MessageContent({ content, sources, reasoning }: { content: string, sour
                     components={{
                         p: ({ children }) => <p className="mb-4 last:mb-0">{children}</p>,
                         ul: ({ children }) => <ul className="list-disc ml-4 mb-4 space-y-2">{children}</ul>,
+                        // Custom renderer for citations
+                        strong: ({ children }) => {
+                            const text = String(children);
+                            if (text.startsWith('[') && text.endsWith(']')) {
+                                const num = text.replace(/[\[\]]/g, '');
+                                if (!isNaN(Number(num))) {
+                                    return <Citation num={num} onClick={() => onCitationClick?.(pageMap[num] || '1')} />;
+                                }
+                            }
+                            return <strong>{children}</strong>;
+                        }
                     }}
                 >
-                    {content.replace(/\[(\d+)\]/g, ' [[$1]] ')}
+                    {/* Convert [1] into **[1]** so ReactMarkdown component can pick it up via 'strong' override */}
+                    {mainContent.replace(/\[(\d+)\]/g, ' **[$1]** ')}
                 </ReactMarkdown>
             </div>
+
+            {/* Interactive Inquiries */}
+            {inquiries.length > 0 && (
+                <div className="mt-4 flex flex-wrap gap-2 animate-in fade-in slide-in-from-bottom-2 duration-700">
+                    {inquiries.map((inquiry, idx) => (
+                        <button
+                            key={idx}
+                            onClick={() => onInquiryClick?.(inquiry)}
+                            className="px-4 py-2 glass-dark hover:bg-blue-600/20 border border-white/5 hover:border-blue-500/30 rounded-xl text-[11px] font-bold text-blue-400 transition-all flex items-center gap-2 group cursor-pointer"
+                        >
+                            <Sparkles size={12} className="opacity-50 group-hover:opacity-100" />
+                            {inquiry}
+                        </button>
+                    ))}
+                </div>
+            )}
 
             {sources && sources.length > 0 && (
                 <div className="mt-6 pt-6 border-t border-white/5 space-y-4">
@@ -115,6 +177,8 @@ function MessageContent({ content, sources, reasoning }: { content: string, sour
         </div>
     );
 }
+
+import { Sparkles } from "lucide-react";
 
 function ChatBody() {
     const [messages, setMessages] = useState<any[]>([]);
@@ -424,7 +488,31 @@ function ChatBody() {
                             messages.map((msg, i) => (
                                 <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={clsx("flex", msg.role === "user" ? "justify-end" : "justify-start")}>
                                     <div className={clsx("max-w-4xl p-6 rounded-[2rem] text-sm", msg.role === "user" ? "bg-blue-600 text-white rounded-tr-none" : "glass-dark border border-white/5 text-gray-100 rounded-tl-none shadow-2xl")}>
-                                        <MessageContent content={msg.content} sources={msg.sources} reasoning={msg.reasoning} />
+                                        <MessageContent
+                                            content={msg.content}
+                                            sources={msg.sources}
+                                            reasoning={msg.reasoning}
+                                            onCitationClick={(page) => {
+                                                if (activeAttachment && iframeRef.current) {
+                                                    const baseUrl = (activeAttachment.url?.includes('drive.google.com') || activeAttachment.type === 'drive')
+                                                        ? `${API_URL}/api/courses/proxy/drive/${activeAttachment.id}?user_email=${localStorage.getItem('user_email')}`
+                                                        : activeAttachment.url?.replace('/view', '/preview');
+
+                                                    try {
+                                                        // Use absolute URL for URL constructor
+                                                        const absoluteBase = baseUrl.startsWith('http') ? baseUrl : window.location.origin + baseUrl;
+                                                        const url = new URL(absoluteBase);
+                                                        url.searchParams.set('page', page);
+                                                        iframeRef.current.src = url.toString();
+                                                    } catch (err) {
+                                                        // Fallback for simple string concat if URL construction fails
+                                                        const separator = baseUrl.includes('?') ? '&' : '?';
+                                                        iframeRef.current.src = `${baseUrl}${separator}page=${page}`;
+                                                    }
+                                                }
+                                            }}
+                                            onInquiryClick={(query) => sendMessage(query)}
+                                        />
                                     </div>
                                 </motion.div>
                             ))
