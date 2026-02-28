@@ -53,7 +53,7 @@ class PromptArchitect:
         
         knowledge_base = "\n\n---\n\n".join(context_blocks) if context_blocks else "General academic intelligence."
 
-        # 2. ORCHESTRATE ASSISTANT KNOWLEDGE (GMAIL/WORKSPACE/ASSETS)
+        # 2. ORCHESTRATE ASSISTANT KNOWLEDGE (WORKSPACE/ASSETS)
         assistant_blocks = []
         if assistant_knowledge:
             # Group assistant knowledge too
@@ -63,11 +63,10 @@ class PromptArchitect:
                 ak_key = meta.get('documentId') or meta.get('subject') or meta.get('id')
                 if ak_key not in ak_docs:
                     label = meta.get('category', 'INTEL').upper()
-                    sender = meta.get('sender', 'Neural Link')
                     subject = meta.get('subject') or meta.get('title') or "Workspace Item"
                     ak_docs[ak_key] = {
-                        "title": f"Email: {subject}",
-                        "header": f"[{label} | SENDER: {sender} | TITLE: {subject}]",
+                        "title": subject,
+                        "header": f"[{label} | TITLE: {subject}]",
                         "chunks": []
                     }
                 ak_docs[ak_key]["chunks"].append(ak.get('content', ''))
@@ -120,7 +119,7 @@ You are an elite academic mentor and Socratic tutor.
 # [CRITICAL] ACADEMIC VAULT (Verified Peer-Reviewed/Course Materials):
 {knowledge_base}
 
-# [SECONDARY] ASSISTANT WORKSPACE (Life/Context/Workspace/Emails):
+# [SECONDARY] ASSISTANT WORKSPACE (Life/Context/Workspace):
 {assistant_workspace}
 
 # [DIGITAL TWIN] PERSONALIZED INTELLIGENCE (Your Memory of the Student):
@@ -130,7 +129,7 @@ You are an elite academic mentor and Socratic tutor.
 # OPERATIONAL DIRECTIVES:
 1. **Grounded Reasoning**: PRIORITIZE the [ACADEMIC VAULT]. Quote materials directly (use "quotation marks").
 2. **Topic Precision**: ONLY use information strictly requested in the current query. Even if the retrieved context contains related topics (e.g., you see 'Doubly' but were asked for 'Singly'), DISCARD the unrelated information.
-3. **Category Isolation**: Do NOT confuse academic materials with emails or past chat assets.
+3. **Category Isolation**: Do NOT confuse academic materials with past chat assets.
 4. **Pedagogical Fidelity**: If the student asks to "solve", "calculate", "derive" or "explain", you MUST:
     - Provide a **Step-by-Step Breakdown** of the logic.
     - Offer a **Neural Benchmark Example**: If the [ACADEMIC VAULT] doesn't have a direct example, synthesize a clear, illustrative one.

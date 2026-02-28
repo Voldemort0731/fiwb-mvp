@@ -5,7 +5,6 @@ import { API_URL, standardize_email } from '@/utils/config';
 
 interface AcademicContextType {
     courses: any[];
-    gmailMaterials: any[];
     loading: boolean;
     syncing: boolean;
     error: string | null;
@@ -17,7 +16,6 @@ const AcademicContext = createContext<AcademicContextType | undefined>(undefined
 
 export function AcademicProvider({ children }: { children: React.ReactNode }) {
     const [courses, setCourses] = useState<any[]>([]);
-    const [gmailMaterials, setGmailMaterials] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [syncing, setSyncing] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -58,19 +56,9 @@ export function AcademicProvider({ children }: { children: React.ReactNode }) {
             }
         };
 
-        const fetchGmail = async () => {
-            try {
-                const res = await fetch(`${API_URL}/api/courses/GMAIL_INBOX/materials?user_email=${email}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    if (Array.isArray(data)) setGmailMaterials(data);
-                }
-            } catch (err) {
-                // Non-critical, fail silently
-            }
-        };
 
-        await Promise.allSettled([fetchCourses(), fetchGmail()]);
+
+        await fetchCourses();
         isFetchingRef.current = false;
         // FIXED: removed courses.length from deps — it caused infinite re-fetch loop
     }, []);
@@ -105,7 +93,7 @@ export function AcademicProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     return (
-        <AcademicContext.Provider value={{ courses, gmailMaterials, loading, syncing, error, refreshData, startSync }}>
+        <AcademicContext.Provider value={{ courses, loading, syncing, error, refreshData, startSync }}>
             {children}
         </AcademicContext.Provider>
     );

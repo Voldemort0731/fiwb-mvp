@@ -7,7 +7,6 @@ from app.models import User
 from app.lms.sync_service import LMSSyncService
 from app.lms.moodle_sync import MoodleSyncService
 from app.lms.drive_service import DriveSyncService
-from app.lms.gmail_service import GmailSyncService
 
 logger = logging.getLogger("uvicorn.error")
 
@@ -70,12 +69,8 @@ async def sync_all_for_user(user_email: str):
             except Exception as e:
                 logger.error(f"❌ [Auto-Sync] Drive failed for {user_email}: {e}")
 
-        # 4. Gmail Sync
-        try:
-            gmail_service = GmailSyncService(access_token, user_email, refresh_token)
-            await gmail_service.sync_recent_emails()
-        except Exception as e:
-            logger.error(f"❌ [Auto-Sync] Gmail failed for {user_email}: {e}")
+        # Gmail sync removed
+        pass
 
         # Final Update
         last_db = SessionLocal()

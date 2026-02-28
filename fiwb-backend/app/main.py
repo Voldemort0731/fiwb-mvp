@@ -58,12 +58,12 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 # Routers
-from app.api import chat, courses, auth, notifications, drive, moodle, gmail, admin, search
+from app.api import chat, courses, auth, notifications, drive, moodle, admin, search
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(courses.router, prefix="/api/courses", tags=["courses"])
-app.include_router(gmail.router, prefix="/api/gmail", tags=["gmail"])
+
 app.include_router(drive.router, prefix="/api/drive", tags=["drive"])
 app.include_router(moodle.router, prefix="/api/moodle", tags=["moodle"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
@@ -94,7 +94,6 @@ async def health_check():
     """Health check endpoint with system status for monitoring"""
     from app.database import SessionLocal
     from app.models import User, Course
-    
     db = SessionLocal()
     try:
         user_count = db.query(User).count()

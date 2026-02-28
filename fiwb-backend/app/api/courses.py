@@ -66,11 +66,9 @@ def get_course_materials(course_id: str, user_email: str, db: Session = Depends(
     if not user:
         return {"error": "User not found"}
 
-    # For GMAIL_INBOX, we don't require course membership check
-    if course_id != "GMAIL_INBOX":
-        course = db.query(Course).filter(Course.id == course_id).first()
-        if not course or course not in user.courses:
-            return {"error": "Access denied"}
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course or course not in user.courses:
+        return {"error": "Access denied"}
 
     # Query materials from local DB — user's own + any unassigned (legacy)
     db_materials = db.query(Material).filter(
@@ -100,7 +98,7 @@ def get_course_materials(course_id: str, user_email: str, db: Session = Depends(
         except:
             atts = []
 
-        source_name = "Gmail" if course_id == "GMAIL_INBOX" else "Google Drive" if course_id == "GOOGLE_DRIVE" else "Google Classroom"
+        source_name = "Google Drive" if course_id == "GOOGLE_DRIVE" else "Google Classroom"
 
         results.append({
             "id": m.id,

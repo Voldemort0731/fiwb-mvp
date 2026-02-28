@@ -104,7 +104,7 @@ class LMSSyncService:
         except Exception as e:
             logger.error(f"[Sync] Phase 1 failed for {self.user_email}: {e}")
             traceback.print_exc()
-            try:
+            try:    
                 db.rollback()
             except:
                 pass
@@ -356,7 +356,7 @@ class LMSSyncService:
         Each file is downloaded, extracted (PDF/Docs/Sheets/etc.), and indexed
         into Supermemory with full course + professor context.
         """
-        import re
+            import re
         from app.lms.drive_service import DriveSyncService
         from app.utils.locks import GLOBAL_API_LOCK
 

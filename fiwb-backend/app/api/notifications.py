@@ -29,7 +29,7 @@ async def receive_notification(request: Request):
             notification = json.loads(decoded_data)
             
             registration_id = notification.get('registrationId')
-            gmail_email = notification.get('emailAddress') # Gmail notifications include this
+
             
             print(f"Received Notification: {notification}")
             
@@ -41,16 +41,6 @@ async def receive_notification(request: Request):
                         logger.info(f"🚀 [Real-Time Sync] Triggering Classroom sync for {user.email}")
                         from app.intelligence.scheduler import sync_all_for_user
                         asyncio.create_task(sync_all_for_user(user.email))
-                
-                elif gmail_email:
-                    # Search for user by email. Standardize to handle aliases.
-                    actual_email = standardize_email(gmail_email)
-                    user = db.query(User).filter(User.email == actual_email).first()
-                    if user:
-                        logger.info(f"📧 [Real-Time Gmail] Triggering Gmail sync for {user.email}")
-                        from app.lms.gmail_service import GmailSyncService
-                        gmail_service = GmailSyncService(user.access_token, user.email, user.refresh_token)
-                        asyncio.create_task(gmail_service.sync_recent_emails(limit=5))
                 else:
                     logger.warning(f"❓ [Webhook] Received unknown notification type: {notification}")
             finally:

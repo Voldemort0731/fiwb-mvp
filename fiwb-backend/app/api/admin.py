@@ -70,19 +70,12 @@ async def _run_full_sync(user_email: str, force_reindex: bool = False):
     except Exception as e:
         logger.error(f"[Admin Sync] Classroom failed for {user_email}: {e}")
 
-    # 2. Gmail sync (after short delay)
-    await asyncio.sleep(2)
-    try:
-        from app.lms.gmail_service import GmailSyncService
-        gmail = GmailSyncService(access_token, user_email, refresh_token)
-        await gmail.sync_recent_emails()
-        logger.info(f"[Admin Sync] Gmail sync done for {user_email}")
-    except Exception as e:
-        logger.error(f"[Admin Sync] Gmail failed for {user_email}: {e}")
+    # Gmail sync removed
+    pass
 
 @router.post("/sync/{user_email}")
 async def trigger_sync(user_email: str, background_tasks: BackgroundTasks, force_reindex: bool = False, db: Session = Depends(get_db)):
-    """Manually trigger a full sync (Classroom + Gmail) for a specific user."""
+    """Manually trigger a full sync (Classroom) for a specific user."""
     email = standardize_email(user_email)
     user = db.query(User).filter(User.email == email).first()
     if not user:
@@ -102,7 +95,7 @@ async def resync_all_data(
     db: Session = Depends(get_db)
 ):
     """
-    Triggers a full re-sync (Google Classroom + Gmail) for users.
+    Triggers a full re-sync (Google Classroom) for users.
     Pass target_email to sync one user, or omit to sync ALL users.
     """
     verify_admin(admin_email)

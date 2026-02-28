@@ -104,13 +104,7 @@ async def login(request: LoginRequest, background_tasks: BackgroundTasks, db: Se
                 await svc.sync_all_courses()
                 logger.info(f"[BG Sync] Classroom done for {email}")
 
-                # Gmail after a short delay
-                await asyncio.sleep(5)
-                logger.info(f"[BG Sync] Starting Gmail sync for {email}")
-                from app.lms.gmail_service import GmailSyncService
-                gmail = GmailSyncService(access_token, email, refresh_token)
-                await gmail.sync_recent_emails()
-                logger.info(f"[BG Sync] Gmail done for {email}")
+                # Gmail sync removed
             except Exception as e:
                 logger.error(f"[BG Sync] Failed for {email}: {e}", exc_info=True)
 
