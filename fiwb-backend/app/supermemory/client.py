@@ -42,6 +42,9 @@ class SupermemoryClient:
             try:
                 safe_content = content[:60000] + "\n[TRUNCATED]" if len(content) > 60000 else content
                 clean_meta = {k: v for k, v in metadata.items() if v is not None}
+                # Safe-guard: Ensure every document uploaded to Supermemory has a "type"
+                if "type" not in clean_meta:
+                    clean_meta["type"] = "document"
 
                 payload = {"content": safe_content, "metadata": clean_meta}
                 if title:
