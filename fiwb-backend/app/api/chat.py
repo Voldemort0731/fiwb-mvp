@@ -162,9 +162,7 @@ async def chat_stream(
     db.add(user_msg_db)
     thread.updated_at = datetime.utcnow()
     db.commit()
-    
-    # Release core DB session before long-running streaming
-    db.close() 
+    # db.close() REMOVED: generate() needs it below 
 
     # 3. Intelligence Multi-tasking
     async def generate():
@@ -220,7 +218,6 @@ async def chat_stream(
                     # 2. Attachments
                     try:
                         atts = json.loads(m.attachments) if m.attachments else []
-                        # Also fetch full attachment contents
                         ids_to_fetch = []
                         for a in atts:
                             fid = a.get("id") or a.get("file_id")
@@ -231,17 +228,20 @@ async def chat_stream(
                             att_materials = db.query(Material).filter(Material.id.in_(ids_to_fetch)).all()
                             for att_m in att_materials:
                                 if att_m.content:
+                                    # INJECT as primary academic document
                                     c_data.setdefault("course_context", []).insert(0, {
                                         "content": att_m.content,
                                         "metadata": {
                                             "title": att_m.title,
                                             "type": "attachment",
-                                            "course_name": m.title,
-                                            "id": att_m.id
+                                            "course_name": m.title, # Label with announcement name for context
+                                            "source_id": m.id, # Parent reference
+                                            "id": att_m.id, # The actual doc to analyze
+                                            "source_link": att_m.source_link
                                         }
                                     })
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.warning(f"Failed to inject attachments for grounding: {e}")
 
             # BROADCAST SOURCES (Dynamic) - ONLY if not general chat
             sources_dict = {}
@@ -257,6 +257,31 @@ async def chat_stream(
                         base_title = meta.get('title') or meta.get('file_name') or "Institutional Document"
                         full_title = f"{base_title} [{course_name}]" if course_name else base_title
                         
+                        mat_id = meta.get("id") or meta.get("source_id")
+                        
+                        # AUTOMATED RESOLUTION: Swap announcement IDs for attachment IDs for better Analyze UX
+                        if meta.get("type") == "announcement":
+                            # Check if we already have a focused attachment for this announcement in c_data
+                            found_att = False
+                            for other in c_data.get("course_context", []):
+                                om = other.get("metadata", {})
+                                if om.get("type") == "attachment" and om.get("source_id") == mat_id:
+                                    mat_id = om.get("id") # Promote the attachment as the analyze target
+                                    found_att = True
+                                    break
+                            
+                            # If not found in current context, check DB if m is reachable (session still open)
+                            if not found_att:
+                                try:
+                                    ann_id = meta.get("id")
+                                    if ann_id:
+                                        m_record = db.query(Material).filter(Material.id == ann_id).first()
+                                        if m_record and m_record.attachments:
+                                            atts = json.loads(m_record.attachments)
+                                            if atts and len(atts) > 0:
+                                                mat_id = atts[0].get("id") or atts[0].get("file_id")
+                                except: pass
+
                         if full_title not in sources_dict:
                             sources_dict[full_title] = {
                                 "title": full_title,
@@ -264,7 +289,7 @@ async def chat_stream(
                                 "link": meta.get("source_link") or meta.get("url") or meta.get("webViewLink") or meta.get("link"),
                                 "snippets": [item.get("content", "")],
                                 "source_type": meta.get("type", "document"),
-                                "material_id": meta.get("id") or meta.get("source_id")
+                                "material_id": mat_id
                             }
                         else:
                             # Append more snippets (up to 3) for more complete context
@@ -320,11 +345,11 @@ async def chat_stream(
             
         except Exception as e:
             logger.error(f"Critical System Stream Failure: {e}", exc_info=True)
-            # Avoid backslashes in f-strings for Python <3.12 compatibility
-            # We use a clear version label to verify deploy: [RELOAD_v2]
-            err_msg_text = '\n\n[Neural Link RESET_v2]: The system encountered a capacity issue. Please REFRESH/RESTART the analysis session.'
+            err_msg_text = '\n\n[Neural Link RESET_v3]: The system encountered a capacity issue. Please REFRESH/RESTART the analysis session.'
             json_err = json.dumps({'token': err_msg_text})
             yield f"data: {json_err}\n\n"
+        finally:
+            db.close() # Close session only after generator finishes
 
     return StreamingResponse(generate(), media_type="text/event-stream")
 

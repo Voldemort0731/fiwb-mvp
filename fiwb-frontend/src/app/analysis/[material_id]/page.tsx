@@ -386,7 +386,10 @@ function AnalysisBody() {
                 const firstDoc = attachments.find((a: any) =>
                     a.title?.toLowerCase().endsWith('.pdf') ||
                     a.type === 'drive_file' ||
-                    a.file_type === 'pdf'
+                    a.file_type === 'pdf' ||
+                    a.driveFile ||
+                    a.url?.includes('drive.google.com') ||
+                    a.alternateLink?.includes('drive.google.com')
                 ) || attachments[0];
 
                 setActiveAttachment(firstDoc);
@@ -434,7 +437,10 @@ function AnalysisBody() {
 
         const docName = activeAttachment ? activeAttachment.title : material.title;
         const initQuery = `Analyze and summarize this "${docName}". Give an executive summary and suggested inquiries.`;
-        sendMessage(initQuery, material.content || "");
+
+        // IMPORTANT: If we have an attachment (PDF), we don't pass the material text
+        // because the backend will fetch the authoritative text for activeAttachment.id
+        sendMessage(initQuery);
     }, [material, activeAttachment]);
 
     // Copy message content
@@ -489,7 +495,10 @@ function AnalysisBody() {
             formData.append("thread_id", threadId || "new");
             formData.append("query_type", "notebook_analysis");
             if (material?.course_id) formData.append("course_id", material.course_id);
-            if (material?.id) formData.append("material_id", material.id);
+
+            // PRIORITY: Focus grounding on the document the student is currently viewing
+            const focusId = activeAttachment?.id || material?.id;
+            if (focusId) formData.append("material_id", focusId);
 
             // Pass document content for grounding
             const textToSend = attachmentText || material?.content || "";
