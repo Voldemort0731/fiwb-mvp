@@ -142,7 +142,7 @@ function MessageContent({
                         <span className="text-[10px] font-black uppercase text-blue-500 tracking-widest">Grounding Context</span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {sources.map((source, idx) => {
+                        {sources.map((source: any, idx: number) => {
                             const displayTitle = source.display || source.title;
                             return (
                                 <motion.div
@@ -162,7 +162,7 @@ function MessageContent({
                                         <h4 className="text-[11px] font-bold text-gray-100 line-clamp-2 mb-2 leading-tight">
                                             {displayTitle}
                                         </h4>
-                                        <div className="mt-auto pt-2 border-t border-white/5 flex items-center justify-between">
+                                        <div className="mt-auto pt-2 border-t border-white/5 flex items-center justify-between gap-4">
                                             {source.link ? (
                                                 <a
                                                     href={source.link}
@@ -174,12 +174,12 @@ function MessageContent({
                                                     View Original
                                                 </a>
                                             ) : (
-                                                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Internal Reference</span>
+                                                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Internal Context</span>
                                             )}
                                             {source.material_id && onAnalyze && (
                                                 <button
                                                     onClick={() => onAnalyze(source.material_id)}
-                                                    className="flex items-center gap-1.5 text-[9px] font-black text-emerald-400 uppercase tracking-wider hover:text-emerald-300 transition-colors cursor-pointer"
+                                                    className="flex items-center gap-1.5 text-[9px] font-black text-emerald-400 uppercase tracking-wider hover:text-emerald-300 transition-colors cursor-pointer shrink-0"
                                                 >
                                                     <ScanSearch size={10} />
                                                     Analyze
@@ -407,12 +407,16 @@ function ChatBody() {
 
                         setMessages(prev => {
                             const newMsgs = [...prev];
-                            const last = { ...newMsgs[newMsgs.length - 1] };
-                            last.content = accumulatedContent;
-                            last.reasoning = accumulatedReasoning;
-                            last.sources = accumulatedSources;
-                            last.thinking = false;
-                            newMsgs[newMsgs.length - 1] = last;
+                            const lastIdx = newMsgs.length - 1;
+                            if (lastIdx >= 0) {
+                                newMsgs[lastIdx] = {
+                                    ...newMsgs[lastIdx],
+                                    content: accumulatedContent,
+                                    reasoning: accumulatedReasoning,
+                                    sources: [...accumulatedSources], // Use fresh copy
+                                    thinking: false
+                                };
+                            }
                             return newMsgs;
                         });
                     }
