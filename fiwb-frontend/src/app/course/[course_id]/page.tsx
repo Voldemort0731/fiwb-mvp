@@ -107,8 +107,14 @@ export default function CoursePage() {
         .filter(item => item.title.toLowerCase().includes(searchQuery.toLowerCase()))
         .filter(item => {
             if (activeTab === "stream") return true;
-            if (activeTab === "classwork") return item.type === "assignment";
-            if (activeTab === "materials") return item.type !== "assignment" && item.type !== "announcement";
+            if (activeTab === "classwork") return item.type === "assignment" || item.type === "material";
+            // Resources: Everything that isn't a direct assignment. 
+            // This includes Classroom Materials, Drive files, and Announcements (if they have attachments)
+            if (activeTab === "materials") {
+                if (item.type === "assignment") return false;
+                if (item.type === "announcement") return (item.attachments?.length > 0);
+                return true;
+            }
             return true;
         });
 
@@ -182,18 +188,22 @@ export default function CoursePage() {
                     </div>
 
                     <div className="flex gap-2">
-                        {(["stream", "classwork", "materials"] as TabType[]).map(tab => (
+                        {[
+                            { id: 'stream', label: 'Feed' },
+                            { id: 'classwork', label: 'Classwork' },
+                            { id: 'materials', label: 'Resources' }
+                        ].map(tab => (
                             <button
-                                key={tab}
-                                onClick={() => setActiveTab(tab)}
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id as TabType)}
                                 className={clsx(
                                     "px-6 py-3 rounded-xl font-bold text-sm uppercase tracking-widest transition-all",
-                                    activeTab === tab
+                                    activeTab === tab.id
                                         ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
                                         : "bg-gray-100 dark:bg-black/40 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-white/5"
                                 )}
                             >
-                                {tab}
+                                {tab.label}
                             </button>
                         ))}
                     </div>

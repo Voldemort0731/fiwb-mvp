@@ -94,11 +94,27 @@ def get_course_materials(course_id: str, user_email: str, db: Session = Depends(
     if not course or course not in user.courses:
         return {"error": "Access denied"}
 
-    # Query materials from local DB — user's own + any unassigned (legacy)
+    # 1. Query materials explicitly assigned to this course
     db_materials = db.query(Material).filter(
         Material.course_id == course_id,
         or_(Material.user_id == user.id, Material.user_id == None)
-    ).order_by(Material.created_at.desc()).all()
+    ).all()
+
+    # 2. Query Google Drive materials that are semantically related (mention course name)
+    if course and course_id != "GOOGLE_DRIVE":
+        # Search for "GOOGLE_DRIVE" materials that mention the course name
+        drive_related = db.query(Material).filter(
+            Material.course_id == "GOOGLE_DRIVE",
+            or_(Material.user_id == user.id, Material.user_id == None),
+            or_(
+                Material.title.ilike(f"%{course.name}%"),
+                Material.content.ilike(f"%{course.name}%")
+            )
+        ).all()
+        db_materials.extend(drive_related)
+
+    # Sort everything by date
+    db_materials.sort(key=lambda x: x.created_at or "", reverse=True)
 
     # Fix orphaned materials (assign user_id where missing)
     orphans_fixed = False
