@@ -280,36 +280,31 @@ async def chat_stream(
                                 # 2. Check DB for focused attachment materials (Authoritative)
                                 if not found_att:
                                     try:
-                                        m_record = db.query(Material).filter(Material.id == ann_id).first()
-                                        if m_record and m_record.attachments:
-                                            try:
-                                                atts = json.loads(m_record.attachments)
-                                                if atts and len(atts) > 0:
-                                                    first_att = atts[0]
-                                                    mat_id = first_att.get("id") or first_att.get("file_id") or first_att.get("fid") # check all variants
-                                                    found_att = True
-                                            except: pass
+                                        # Search for materials whose parent project is this announcement
+                                        child_att = db.query(Material).filter(
+                                            (Material.id.like(f"%{ann_id}%")) | (Material.source_link.like(f"%{ann_id}%")),
+                                            Material.type.in_(["drive_file", "attachment", "announcement_drive_attachment"])
+                                        ).first()
+                                        if child_att:
+                                            mat_id = child_att.id
+                                            found_att = True
                                         
-                                        # 3. Fallback to broad search if needed
+                                        # 3. If no child record, check parent attachments JSON
                                         if not found_att:
-                                            # Try all known prefix patterns
-                                            prefixes = ["ann_att_", "drive_file_", ""]
-                                            for p in prefixes:
-                                                search_id = f"{p}{ann_id}"
-                                                child_att = db.query(Material).filter(Material.id == search_id).first()
-                                                if child_att:
-                                                    mat_id = child_att.id
-                                                    found_att = True
-                                                    break
-                                        
-                                        # 4. Final last-resort: link/content search
-                                        if not found_att:
-                                            child_att = db.query(Material).filter(
-                                                (Material.source_link.like(f"%{ann_id}%")),
-                                                Material.type.in_(["drive_file", "attachment", "announcement_drive_attachment"])
-                                            ).first()
-                                            if child_att:
-                                                mat_id = child_att.id
+                                            m_record = db.query(Material).filter(Material.id == ann_id).first()
+                                            if m_record and m_record.attachments:
+                                                try:
+                                                    atts_json = json.loads(m_record.attachments)
+                                                    if atts_json:
+                                                        # Use the first drive file's ID
+                                                        for a in atts_json:
+                                                            df = a.get("driveFile", {}).get("driveFile", {}) if "driveFile" in a else a
+                                                            fid = df.get("id") or df.get("file_id") or a.get("id")
+                                                            if fid:
+                                                                mat_id = fid # Resilient lookup in courses.py will handle the rest
+                                                                found_att = True
+                                                                break
+                                                except: pass
                                     except: pass
 
                         # RECOVERY: If title is generic/missing, try to find it in the local DB

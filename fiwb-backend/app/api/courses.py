@@ -210,15 +210,22 @@ def get_material(material_id: str, user_email: str, db: Session = Depends(get_db
     except Exception:
         atts = []
 
-    # RECOVERY: If it is a drive_file but attachments failed to load, synthesize the entry
-    if not atts and m.type in ["drive_file", "announcement_drive_attachment", "assignment", "material"]:
-        if m.source_link and ("drive.google.com" in m.source_link or "docs.google.com" in m.source_link):
+    # RECOVERY: If it is a drive_file/announcement but attachments failed to load, synthesize the entry
+    if not atts:
+        link = m.source_link or ""
+        # Expand recovery to include 'announcement' type
+        if m.type in ["drive_file", "announcement"] and ("drive.google.com" in link or "docs.google.com" in link):
+            # Extract raw ID from link for the proxy
+            import re
+            file_id_match = re.search(r'([a-zA-Z0-9_-]{25,})', link)
+            raw_id = file_id_match.group(1) if file_id_match else m.id
+            
             atts.append({
-                "id": m.id,
+                "id": raw_id,
                 "title": m.title or "PDF Handout",
-                "url": m.source_link,
-                "type": "drive_file",
-                "file_type": "pdf" if (".pdf" in (m.title or "").lower()) else "document"
+                "url": link,
+                "type": "drive_file", # Ensure type is "drive_file" for synthesized attachments
+                "file_type": "pdf" if (".pdf" in (m.title or "").lower() or "pdf" in (m.content or "").lower()) else "document"
             })
 
     return {

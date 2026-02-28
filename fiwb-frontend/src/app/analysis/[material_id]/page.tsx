@@ -383,7 +383,7 @@ function AnalysisBody() {
 
                 // Select first PDF or any attachment
                 const attachments = data.attachments || [];
-                const firstDoc = attachments.find((a: any) =>
+                let firstDoc = attachments.find((a: any) =>
                     a.title?.toLowerCase().endsWith('.pdf') ||
                     a.type === 'drive_file' ||
                     a.file_type === 'pdf' ||
@@ -391,6 +391,19 @@ function AnalysisBody() {
                     a.url?.includes('drive.google.com') ||
                     a.alternateLink?.includes('drive.google.com')
                 ) || attachments[0];
+
+                // RECOVERY: If NO attachment found but source_link is a drive link, synthesize one
+                if (!firstDoc && data.source_link?.includes('drive.google.com')) {
+                    const fileIdMatch = data.source_link.match(/\/d\/([a-zA-Z0-9_-]{25,})/);
+                    const fid = fileIdMatch ? fileIdMatch[1] : data.id;
+                    firstDoc = {
+                        id: fid,
+                        title: data.title || "PDF Document",
+                        url: data.source_link,
+                        type: "drive_file",
+                        file_type: "pdf"
+                    };
+                }
 
                 setActiveAttachment(firstDoc);
             } catch (err) {
