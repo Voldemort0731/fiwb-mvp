@@ -402,15 +402,7 @@ export default function CoursePage() {
                                                                     </div>
                                                                 </>
                                                             )}
-                                                            {attachmentCount > 0 && (
-                                                                <>
-                                                                    <span className="text-xs text-gray-600 font-bold">•</span>
-                                                                    <div className="flex items-center gap-1 text-xs text-blue-400 font-bold">
-                                                                        <FileText size={12} />
-                                                                        <span>{attachmentCount} {attachmentCount === 1 ? 'file' : 'files'}</span>
-                                                                    </div>
-                                                                </>
-                                                            )}
+
                                                             <span className="text-xs text-gray-600 font-bold">•</span>
                                                             <span className="text-xs text-gray-900 dark:text-gray-600 font-black tracking-widest uppercase tracking-higher">{item.date}</span>
                                                         </div>
@@ -511,7 +503,7 @@ export default function CoursePage() {
                                     {(selectedItem.attachments && selectedItem.attachments.length > 0) && (
                                         <div className="bg-gray-50 dark:bg-black/40 p-6 rounded-2xl border border-gray-100 dark:border-white/5">
                                             <h3 className="text-sm font-bold uppercase tracking-widest text-gray-600 dark:text-gray-500 mb-4">
-                                                📎 Documents & Files ({selectedItem.attachments.length})
+                                                📎 Documents & Files
                                             </h3>
                                             <div className="grid grid-cols-1 gap-4">
                                                 {selectedItem.attachments.map((attachment: any, idx: number) => {

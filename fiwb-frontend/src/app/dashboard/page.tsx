@@ -344,7 +344,6 @@ export default function Dashboard() {
                                     </div>
                                     <h3 className="font-black tracking-tight">Your Courses</h3>
                                 </div>
-                                <span className="text-[10px] font-bold px-2 py-1 bg-gray-100 dark:bg-white/5 rounded-lg text-gray-500">{courses.length} TOTAL</span>
                             </div>
 
                             <div className="relative group">
@@ -408,12 +407,6 @@ export default function Dashboard() {
                                                         <p className="text-[11px] text-gray-500 font-medium truncate">
                                                             {course.latest_update}
                                                         </p>
-                                                        {course.latest_attachment_count > 0 && (
-                                                            <div className="flex items-center gap-1 text-[10px] text-blue-500 font-bold bg-blue-500/10 px-1.5 py-0.5 rounded flex-shrink-0">
-                                                                <FileText size={10} />
-                                                                <span>{course.latest_attachment_count}</span>
-                                                            </div>
-                                                        )}
                                                     </div>
                                                 )}
                                             </div>
