@@ -25,3 +25,6 @@ fiwb-backend/.env
 fiwb-backend/fiwb.db
 fiwb-backend/fiwb.db-shm
 fiwb-backend/fiwb.db-wal
+fiwb.db
+fiwb.db-shm
+fiwb.db-wal
