@@ -591,7 +591,7 @@ export default function CoursePage() {
                                             Open in Classroom
                                         </button>
                                         <button
-                                            onClick={() => router.push(`/analysis/${selectedItem.id}`)}
+                                            onClick={() => router.push(`/chat?material_id=${selectedItem.id}`)}
                                             className="px-6 py-3 glass-dark hover:bg-white/5 text-gray-400 hover:text-white font-bold rounded-xl transition-all border border-white/5 cursor-pointer"
                                         >
                                             Ask AI About This
