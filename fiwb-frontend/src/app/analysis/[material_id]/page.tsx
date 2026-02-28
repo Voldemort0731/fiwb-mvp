@@ -8,7 +8,7 @@ import {
     ChevronLeft, ExternalLink,
     Loader2, Copy, Check, Search,
     BookOpen, Lightbulb, MessageSquare,
-    ChevronDown, ArrowRight
+    ChevronDown, ArrowRight, RefreshCw
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
@@ -242,117 +242,7 @@ function ThinkingIndicator({ step }: { step: string }) {
     );
 }
 
-/* ─────────────── COMPONENT: Document Viewer (Handles Google Drive Auth) ─────────────── */
-
-function extractDriveFileId(url: string): string | null {
-    if (!url) return null;
-    // Match /file/d/FILE_ID/ or /d/FILE_ID/ or id=FILE_ID
-    const patterns = [
-        /\/file\/d\/([a-zA-Z0-9_-]+)/,
-        /\/d\/([a-zA-Z0-9_-]+)/,
-        /[?&]id=([a-zA-Z0-9_-]+)/,
-        /\/presentation\/d\/([a-zA-Z0-9_-]+)/,
-        /\/document\/d\/([a-zA-Z0-9_-]+)/,
-        /\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/,
-    ];
-    for (const p of patterns) {
-        const match = url.match(p);
-        if (match) return match[1];
-    }
-    return null;
-}
-
-function DocumentViewer({ attachment, iframeRef }: { attachment: Attachment; iframeRef: React.RefObject<HTMLIFrameElement | null> }) {
-    const [iframeLoaded, setIframeLoaded] = useState(false);
-    const [showFallback, setShowFallback] = useState(false);
-
-    const fileId = extractDriveFileId(attachment.url || "");
-
-    // Build the best embed URL
-    const getEmbedUrl = () => {
-        if (fileId) {
-            // Use the Google Drive embed/preview URL
-            return `https://drive.google.com/file/d/${fileId}/preview`;
-        }
-        // Fallback: just convert /view to /preview
-        return attachment.url?.replace('/view', '/preview') || attachment.url;
-    };
-
-    const openInBrowser = () => {
-        const url = attachment.url || (fileId ? `https://drive.google.com/file/d/${fileId}/view` : null);
-        if (url) window.open(url, '_blank');
-    };
-
-    const openInDocsViewer = () => {
-        const url = attachment.url || (fileId ? `https://drive.google.com/file/d/${fileId}/view` : null);
-        if (url) window.open(`https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`, '_blank');
-    };
-
-    // If the iframe takes too long, show the fallback after 5 seconds
-    useEffect(() => {
-        setIframeLoaded(false);
-        setShowFallback(false);
-        const timer = setTimeout(() => {
-            if (!iframeLoaded) setShowFallback(true);
-        }, 6000);
-        return () => clearTimeout(timer);
-    }, [attachment.id]);
-
-    return (
-        <div className="w-full h-full relative">
-            {/* Iframe (always try to render) */}
-            <iframe
-                ref={iframeRef}
-                src={getEmbedUrl()}
-                className="w-full h-full border-none"
-                title="Document Preview"
-                allow="autoplay; encrypted-media"
-                onLoad={() => setIframeLoaded(true)}
-            />
-
-            {/* Loading overlay */}
-            {!iframeLoaded && !showFallback && (
-                <div className="absolute inset-0 bg-[#0a0a0a] flex flex-col items-center justify-center z-10">
-                    <Loader2 className="w-10 h-10 text-blue-500 animate-spin mb-4" />
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Loading document viewer...</p>
-                </div>
-            )}
-
-            {/* Fallback overlay when iframe auth fails */}
-            {showFallback && (
-                <div className="absolute inset-0 bg-[#0a0a0a]/95 backdrop-blur-xl flex flex-col items-center justify-center z-20 p-10">
-                    <div className="w-20 h-20 rounded-3xl bg-blue-600/10 flex items-center justify-center mb-6 border border-blue-500/20">
-                        <FileText size={36} className="text-blue-500" />
-                    </div>
-                    <h3 className="text-lg font-black text-white mb-2 text-center">Document Requires Authentication</h3>
-                    <p className="text-sm text-gray-400 max-w-sm text-center mb-8 leading-relaxed">
-                        This PDF is stored on Google Drive and requires a sign-in. Open it in a new tab to view while the AI analyzes it here.
-                    </p>
-                    <div className="flex flex-col gap-3 w-full max-w-xs">
-                        <button
-                            onClick={openInBrowser}
-                            className="w-full py-3.5 bg-blue-600 hover:bg-blue-500 text-white font-black text-sm rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-blue-600/20 active:scale-[0.98] cursor-pointer"
-                        >
-                            <ExternalLink size={16} />
-                            Open Document in Browser
-                        </button>
-                        <button
-                            onClick={openInDocsViewer}
-                            className="w-full py-3 bg-white/5 hover:bg-white/10 text-gray-300 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 border border-white/5 cursor-pointer"
-                        >
-                            <Search size={14} />
-                            Try Google Docs Viewer
-                        </button>
-                    </div>
-                    <p className="mt-6 text-[9px] font-bold text-gray-600 uppercase tracking-widest text-center">
-                        The AI analysis on the right is fully functional
-                    </p>
-                </div>
-            )}
-        </div>
-    );
-}
-
+/* ─────────────── MAIN COMPONENT ─────────────── */
 
 function AnalysisBody() {
     const { material_id } = useParams();
@@ -674,19 +564,49 @@ function AnalysisBody() {
                             </div>
                         )}
 
-                        <div className="flex-1 relative overflow-hidden bg-[#0a0a0a]">
+                        <div className="flex-1 relative bg-white overflow-hidden">
                             {activeAttachment ? (
-                                <DocumentViewer attachment={activeAttachment} iframeRef={iframeRef} />
+                                <iframe
+                                    key={`${activeAttachment.id}-${userEmail}`}
+                                    ref={iframeRef}
+                                    src={
+                                        activeAttachment.url?.includes('drive.google.com')
+                                            ? `${API_URL}/api/courses/proxy/drive/${activeAttachment.id}?user_email=${userEmail}`
+                                            : activeAttachment.url?.replace('/view', '/preview')
+                                    }
+                                    className="w-full h-full border-none"
+                                    title="Document Preview"
+                                    allow="autoplay"
+                                />
                             ) : (
                                 <div className="w-full h-full flex flex-col items-center justify-center bg-[#0a0a0a] p-10 text-center">
                                     <div className="w-20 h-20 rounded-3xl bg-white/5 flex items-center justify-center mb-6 border border-white/10">
                                         <FileText size={40} className="text-gray-600" />
                                     </div>
                                     <h3 className="text-xl font-black text-white mb-2">Text-Only Resource</h3>
-                                    <p className="text-gray-500 max-w-md">This material doesn&apos;t have a PDF attachment. The AI is analyzing the text content directly.</p>
+                                    <p className="text-gray-500 max-w-md">This material doesn&apos;t have a PDF attachment. Use the AI to analyze its contents.</p>
                                     <div className="mt-8 p-6 glass-dark rounded-2xl border border-white/5 text-left w-full max-w-2xl overflow-y-auto max-h-[400px]">
                                         <p className="text-gray-300 font-medium whitespace-pre-wrap">{material?.content}</p>
                                     </div>
+                                </div>
+                            )}
+
+                            {/* Viewer Controls Overlay */}
+                            {activeAttachment?.url?.includes('drive.google.com') && (
+                                <div className="absolute top-4 right-4 flex items-center gap-2">
+                                    <button
+                                        onClick={() => {
+                                            if (iframeRef.current) {
+                                                const originalSrc = iframeRef.current.src;
+                                                iframeRef.current.src = 'about:blank';
+                                                setTimeout(() => { if (iframeRef.current) iframeRef.current.src = originalSrc; }, 50);
+                                            }
+                                        }}
+                                        className="p-2.5 glass-dark border border-white/10 rounded-xl text-gray-400 hover:text-white hover:bg-white/10 transition-all flex items-center gap-2 text-[10px] font-black uppercase tracking-widest cursor-pointer group"
+                                    >
+                                        <RefreshCw size={14} className="group-hover:rotate-180 transition-transform duration-500" />
+                                        Refresh Viewer
+                                    </button>
                                 </div>
                             )}
                         </div>
