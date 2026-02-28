@@ -66,7 +66,7 @@ export default function TopNav() {
                                     key={link.name}
                                     href={link.href}
                                     className={clsx(
-                                        "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all",
+                                        "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all cursor-pointer",
                                         isActive
                                             ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
                                             : "text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-white/5"
@@ -88,7 +88,7 @@ export default function TopNav() {
                             onClick={() => {
                                 setIsDropdownOpen(!isDropdownOpen);
                             }}
-                            className="flex items-center gap-3 pl-2 pr-1 py-1 rounded-2xl hover:bg-gray-50 dark:hover:bg-white/5 transition-all text-left"
+                            className="flex items-center gap-3 pl-2 pr-1 py-1 rounded-2xl hover:bg-gray-50 dark:hover:bg-white/5 transition-all text-left cursor-pointer"
                         >
                             <div className="flex flex-col items-end">
                                 <span className="text-sm font-black text-gray-900 dark:text-white leading-tight">
@@ -119,12 +119,12 @@ export default function TopNav() {
                                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
                                     className="absolute right-0 mt-3 w-64 bg-white dark:bg-[#0a0a0a] border border-gray-100 dark:border-white/10 rounded-2xl shadow-2xl p-2 z-[110]"
                                 >
-                                    <Link href="/settings" className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-all text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
+                                    <Link href="/settings" className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-all text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white cursor-pointer">
                                         <Settings size={18} />
                                         <span className="text-sm font-bold">Settings</span>
                                     </Link>
                                     {user.email === "owaissayyed2007@gmail.com" && (
-                                        <Link href="/admin" className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-all text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
+                                        <Link href="/admin" className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-white/5 transition-all text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white cursor-pointer">
                                             <TrendingUp size={18} />
                                             <span className="text-sm font-bold">Operational Insights</span>
                                         </Link>
@@ -132,7 +132,7 @@ export default function TopNav() {
                                     <div className="h-px bg-gray-100 dark:bg-white/5 my-2 mx-2" />
                                     <button
                                         onClick={handleSignOut}
-                                        className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-red-50 dark:hover:bg-red-500/5 transition-all text-red-500 hover:text-red-600"
+                                        className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-red-50 dark:hover:bg-red-500/5 transition-all text-red-500 hover:text-red-600 cursor-pointer"
                                     >
                                         <LogOut size={18} />
                                         <span className="text-sm font-bold">De-authorize Session</span>

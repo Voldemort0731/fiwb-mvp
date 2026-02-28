@@ -301,15 +301,14 @@ export default function Dashboard() {
                                 <span className="text-xs font-black uppercase tracking-widest text-gray-400 mr-2">Quick Actions:</span>
                                 <button
                                     onClick={() => router.push("/chat")}
-                                    className="px-5 py-2.5 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-600/10 hover:border-blue-500/30 transition-all active:scale-95"
+                                    className="px-5 py-2.5 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-600/10 hover:border-blue-500/30 transition-all active:scale-95 cursor-pointer"
                                 >
                                     <MessageSquare size={16} className="text-blue-500" />
                                     Chatbot
                                 </button>
-
                                 <button
                                     onClick={() => setIsDriveModalOpen(true)}
-                                    className="px-5 py-2.5 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-600/10 hover:border-blue-500/30 transition-all active:scale-95"
+                                    className="px-5 py-2.5 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-600/10 hover:border-blue-500/30 transition-all active:scale-95 cursor-pointer"
                                 >
                                     <Cloud size={16} className="text-sky-500" />
                                     Sync Drive
@@ -317,7 +316,7 @@ export default function Dashboard() {
                                 <button
                                     onClick={handleSync}
                                     disabled={syncing}
-                                    className="px-5 py-2.5 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-600/10 hover:border-blue-500/30 transition-all active:scale-95 disabled:opacity-50"
+                                    className="px-5 py-2.5 bg-white dark:bg-white/5 border border-gray-100 dark:border-white/10 rounded-2xl flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-600/10 hover:border-blue-500/30 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
                                 >
                                     <RefreshCw size={16} className={clsx("text-emerald-500", syncing && "animate-spin")} />
                                     {syncing ? "Refreshing..." : "Refresh Classroom"}
@@ -482,14 +481,14 @@ export default function Dashboard() {
                             <div className="grid grid-cols-2 gap-4">
                                 <button
                                     onClick={() => router.push('/settings')}
-                                    className="p-6 bg-gray-50 dark:bg-white/5 rounded-[2rem] flex flex-col items-center gap-3 hover:bg-blue-50 dark:hover:bg-blue-600/10 transition-all border border-transparent hover:border-blue-500/20"
+                                    className="p-6 bg-gray-50 dark:bg-white/5 rounded-[2rem] flex flex-col items-center gap-3 hover:bg-blue-50 dark:hover:bg-blue-600/10 transition-all border border-transparent hover:border-blue-500/20 cursor-pointer"
                                 >
                                     <SettingsIcon className="text-blue-500" size={24} />
                                     <span className="text-xs font-black uppercase tracking-widest text-gray-600 dark:text-gray-400">Settings</span>
                                 </button>
                                 <button
                                     onClick={toggleTheme}
-                                    className="p-6 bg-gray-50 dark:bg-white/5 rounded-[2rem] flex flex-col items-center gap-3 hover:bg-indigo-50 dark:hover:bg-indigo-600/10 transition-all border border-transparent hover:border-indigo-500/20"
+                                    className="p-6 bg-gray-50 dark:bg-white/5 rounded-[2rem] flex flex-col items-center gap-3 hover:bg-indigo-50 dark:hover:bg-indigo-600/10 transition-all border border-transparent hover:border-indigo-500/20 cursor-pointer"
                                 >
                                     <div className="relative">
                                         <Sun size={24} className="text-orange-500 dark:opacity-0 transition-opacity" />
@@ -511,7 +510,7 @@ export default function Dashboard() {
                                 <p className="text-white/80 text-sm font-medium leading-relaxed">Integrated {courses.length} courses into your AI Chatbot repository.</p>
                                 <button
                                     onClick={() => router.push('/chat')}
-                                    className="px-6 py-3 bg-white text-blue-600 font-black rounded-xl text-xs uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all"
+                                    className="px-6 py-3 bg-white text-blue-600 font-black rounded-xl text-xs uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all cursor-pointer"
                                 >
                                     Ask Anything
                                 </button>

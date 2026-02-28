@@ -153,7 +153,7 @@ export default function CoursePage() {
                 <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-600/5 rounded-full blur-[120px] pointer-events-none" />
 
                 <header className="px-10 py-12 relative z-10 border-b border-gray-100 dark:border-white/5 bg-white/50 dark:bg-black/40 backdrop-blur-xl transition-colors">
-                    <Link href="/dashboard" className="inline-flex items-center gap-2 text-gray-600 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-6 text-sm font-black uppercase tracking-widest group">
+                    <Link href="/dashboard" className="inline-flex items-center gap-2 text-gray-600 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors mb-6 text-sm font-black uppercase tracking-widest group cursor-pointer">
                         <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
                         Back to Dashboard
                     </Link>
@@ -200,7 +200,7 @@ export default function CoursePage() {
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id as TabType)}
                                 className={clsx(
-                                    "px-6 py-3 rounded-xl font-bold text-sm uppercase tracking-widest transition-all",
+                                    "px-6 py-3 rounded-xl font-bold text-sm uppercase tracking-widest transition-all cursor-pointer",
                                     activeTab === tab.id
                                         ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
                                         : "bg-gray-100 dark:bg-black/40 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-200 dark:hover:bg-white/5"
@@ -243,7 +243,8 @@ export default function CoursePage() {
                                                         animate={{ opacity: 1, y: 0 }}
                                                         transition={{ delay: i * 0.05 }}
                                                         key={item.id}
-                                                        className="glass-card rounded-[2rem] border border-white/5 overflow-hidden hover:border-blue-500/20 transition-all shadow-2xl shadow-black/20"
+                                                        onClick={() => setSelectedItem(item)}
+                                                        className="glass-card rounded-[2rem] border border-white/5 overflow-hidden hover:border-blue-500/20 transition-all shadow-2xl shadow-black/20 cursor-pointer group"
                                                     >
                                                         <div className="p-8">
                                                             {/* Card Header */}
@@ -310,8 +311,8 @@ export default function CoursePage() {
                                                                                 return (
                                                                                     <button
                                                                                         key={idx}
-                                                                                        onClick={() => handlePreview(att)}
-                                                                                        className="flex items-center gap-4 p-3 glass-dark hover:bg-white/10 border border-white/5 rounded-2xl transition-all text-left group/att"
+                                                                                        onClick={(e) => { e.stopPropagation(); handlePreview(att); }}
+                                                                                        className="flex items-center gap-4 p-3 glass-dark hover:bg-white/10 border border-white/5 rounded-2xl transition-all text-left group/att cursor-pointer"
                                                                                     >
                                                                                         <div className="w-10 h-10 rounded-xl bg-black/40 flex items-center justify-center shrink-0 border border-white/5 group-hover/att:border-blue-500/30 transition-colors">
                                                                                             <AttachIcon size={20} className="text-blue-400" />
@@ -332,15 +333,15 @@ export default function CoursePage() {
                                                                 {/* Card Actions */}
                                                                 <div className="flex items-center gap-3 pt-4">
                                                                     <button
-                                                                        onClick={() => router.push(`/chat?query=${encodeURIComponent(`Tell me about this from ${course?.name}: ${item.title}`)}`)}
-                                                                        className="px-6 py-3 glass-dark hover:bg-blue-600/10 border border-white/5 hover:border-blue-500/20 rounded-2xl text-xs font-black uppercase tracking-widest text-blue-400 transition-all flex items-center gap-2"
+                                                                        onClick={(e) => { e.stopPropagation(); router.push(`/chat?query=${encodeURIComponent(`Tell me about this from ${course?.name}: ${item.title}`)}`); }}
+                                                                        className="px-6 py-3 glass-dark hover:bg-blue-600/10 border border-white/5 hover:border-blue-500/20 rounded-2xl text-xs font-black uppercase tracking-widest text-blue-400 transition-all flex items-center gap-2 cursor-pointer"
                                                                     >
                                                                         <Sparkles size={14} />
                                                                         Analyze with AI
                                                                     </button>
                                                                     <button
-                                                                        onClick={() => setSelectedItem(item)}
-                                                                        className="px-6 py-3 glass-dark hover:bg-white/5 border border-white/5 rounded-2xl text-xs font-black uppercase tracking-widest text-gray-400 transition-all"
+                                                                        onClick={(e) => { e.stopPropagation(); setSelectedItem(item); }}
+                                                                        className="px-6 py-3 glass-dark hover:bg-white/5 border border-white/5 rounded-2xl text-xs font-black uppercase tracking-widest text-gray-400 transition-all cursor-pointer"
                                                                     >
                                                                         Details
                                                                     </button>
@@ -546,7 +547,7 @@ export default function CoursePage() {
                                                                     {(attachment.file_type === 'pdf' || attachment.file_type === 'image') && (
                                                                         <button
                                                                             onClick={() => handlePreview(attachment)}
-                                                                            className="p-2 glass-dark hover:bg-blue-500/20 rounded-lg transition-colors group/btn"
+                                                                            className="p-2 glass-dark hover:bg-blue-500/20 rounded-lg transition-colors group/btn cursor-pointer"
                                                                             title="Preview"
                                                                         >
                                                                             <Eye size={16} className="text-gray-400 group-hover/btn:text-blue-400" />
@@ -556,7 +557,7 @@ export default function CoursePage() {
                                                                         href={attachment.url}
                                                                         target="_blank"
                                                                         rel="noopener noreferrer"
-                                                                        className="p-2 glass-dark hover:bg-green-500/20 rounded-lg transition-colors group/btn"
+                                                                        className="p-2 glass-dark hover:bg-green-500/20 rounded-lg transition-colors group/btn cursor-pointer"
                                                                         title="Open"
                                                                     >
                                                                         <ExternalLink size={16} className="text-gray-400 group-hover/btn:text-green-400" />
@@ -565,7 +566,7 @@ export default function CoursePage() {
                                                                         <a
                                                                             href={attachment.url}
                                                                             download
-                                                                            className="p-2 glass-dark hover:bg-purple-500/20 rounded-lg transition-colors group/btn"
+                                                                            className="p-2 glass-dark hover:bg-purple-500/20 rounded-lg transition-colors group/btn cursor-pointer"
                                                                             title="Download"
                                                                         >
                                                                             <Download size={16} className="text-gray-400 group-hover/btn:text-purple-400" />
@@ -585,7 +586,7 @@ export default function CoursePage() {
                                             onClick={() => selectedItem.source_link && window.open(selectedItem.source_link, '_blank')}
                                             disabled={!selectedItem.source_link}
                                             className={clsx(
-                                                "flex-1 px-6 py-3 font-bold rounded-xl transition-colors",
+                                                "flex-1 px-6 py-3 font-bold rounded-xl transition-colors cursor-pointer",
                                                 selectedItem.source_link
                                                     ? "bg-blue-600 hover:bg-blue-700 text-white"
                                                     : "bg-gray-800 text-gray-500 cursor-not-allowed"
@@ -595,7 +596,7 @@ export default function CoursePage() {
                                         </button>
                                         <button
                                             onClick={() => router.push(`/chat?query=${encodeURIComponent(`Tell me more about "${selectedItem.title}" from the course "${course?.name || ''}"`)}`)}
-                                            className="px-6 py-3 glass-dark hover:bg-white/5 text-gray-400 hover:text-white font-bold rounded-xl transition-colors border border-white/5"
+                                            className="px-6 py-3 glass-dark hover:bg-white/5 text-gray-400 hover:text-white font-bold rounded-xl transition-colors border border-white/5 cursor-pointer"
                                         >
                                             Ask AI About This
                                         </button>
