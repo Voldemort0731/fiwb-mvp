@@ -105,24 +105,27 @@ Rules:
             
             focused_filters.append({"OR": or_conditions})
 
+        # Helper to skip tasks safely
+        async def skip(): return {"results": []}
+
         # 2. Parallel Search Execution
         UsageTracker.log_sm_request(self.user_email) # Log once for the batch
         
         tasks = [
             # Course search
-            self.sm_client.search(query=search_query, filters={"AND": course_filters}, limit=15) if query_type != "general_chat" else asyncio.sleep(0, result={}),
+            self.sm_client.search(query=search_query, filters={"AND": course_filters}, limit=15) if query_type != "general_chat" else skip(),
             # Focused search (Direct Material + Attachments) 
             self.sm_client.search(
                 query=search_query, 
                 filters={"AND": focused_filters}, 
                 limit=25
-            ) if material_id else asyncio.sleep(0, result={}),
+            ) if material_id else skip(),
             # Memory search
-            self.sm_client.search(query=search_query, filters={"AND": memory_filters}, limit=5) if query_type != "general_chat" else asyncio.sleep(0, result={}),
+            self.sm_client.search(query=search_query, filters={"AND": memory_filters}, limit=5) if query_type != "general_chat" else skip(),
             # Assistant knowledge search
-            self.sm_client.search(query=search_query, filters={"AND": assistant_filters}, limit=5) if query_type != "general_chat" else asyncio.sleep(0, result={}),
+            self.sm_client.search(query=search_query, filters={"AND": assistant_filters}, limit=5) if query_type != "general_chat" else skip(),
             # Chat Assets search
-            self.sm_client.search(query=search_query, filters={"AND": chat_filters}, limit=5) if query_type != "general_chat" else asyncio.sleep(0, result={}),
+            self.sm_client.search(query=search_query, filters={"AND": chat_filters}, limit=5) if query_type != "general_chat" else skip(),
             # Profile search (Always run for personalization)
             self.sm_client.search(query="User learning style preferences personal context assistant profile", filters={"AND": profile_filters}, limit=3)
         ]
@@ -131,9 +134,6 @@ Rules:
         
         course_res, focused_res, memory_res, assistant_res, chat_res, profile_res = results
         
-        # Combine focused results into course_context
-        all_course_chunks = flatten_v3(course_res) + flatten_v3(focused_res)
-
         def flatten_v3(res):
             if not res or not isinstance(res, dict): return []
             all_chunks = []
@@ -143,14 +143,13 @@ Rules:
                 for chunk in doc.get('chunks', []):
                     # Combine doc metadata, chunk metadata, and doc_id
                     chunk_meta = {**meta, **chunk.get('metadata', {})}
-                    if doc_id:
-                        chunk_meta['documentId'] = doc_id
-                    
-                    all_chunks.append({
-                        "content": chunk.get('content', ''),
-                        "metadata": chunk_meta
-                    })
+                    chunk_meta['documentId'] = doc_id
+                    all_chunks.append({"content": chunk.get("content", ""), "metadata": chunk_meta})
             return all_chunks
+
+        # Combine focused results into course_context
+        all_course_chunks = flatten_v3(course_res) + flatten_v3(focused_res)
+
 
         return {
             "course_context": all_course_chunks,
