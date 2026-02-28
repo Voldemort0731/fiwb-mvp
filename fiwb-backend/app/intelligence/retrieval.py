@@ -64,7 +64,8 @@ Rules:
         query: str, 
         query_type: str,
         history: List[Dict] = None,
-        course_filter: str = None
+        course_filter: str = None,
+        material_id: str = None
     ) -> Dict[str, List[Dict]]:
         """Optimized parallel retrieval of course context, assistant knowledge, and memories."""
         
@@ -91,14 +92,31 @@ Rules:
         # Profile Filters
         profile_filters = [{"key": "user_id", "value": self.user_email, "negate": False}, {"key": "type", "value": "user_profile", "negate": False}]
 
+        # Focused search if material_id is provided
+        # Handle announcements (parent-child relationship)
+        ann_id_only = material_id.replace("ann_", "") if material_id and material_id.startswith("ann_") else None
+        
+        focused_filters = {
+            "OR": [
+                {"key": "source_id", "value": material_id, "negate": False},
+                {"key": "parent_announcement_id", "value": ann_id_only, "negate": False}
+            ]
+        } if material_id else None
+
         # 2. Parallel Search Execution
         UsageTracker.log_sm_request(self.user_email) # Log once for the batch
         
         tasks = [
             # Course search
-            self.sm_client.search(query=search_query, filters={"AND": course_filters}, limit=10) if query_type != "general_chat" else asyncio.sleep(0, result={}),
+            self.sm_client.search(query=search_query, filters={"AND": course_filters}, limit=15) if query_type != "general_chat" else asyncio.sleep(0, result={}),
+            # Focused search (Direct Material + Attachments)
+            self.sm_client.search(
+                query=search_query, 
+                filters={"AND": [{"key": "user_id", "value": self.user_email, "negate": False}], **(focused_filters if focused_filters else {})}, 
+                limit=25
+            ) if material_id else asyncio.sleep(0, result={}),
             # Memory search
-            self.sm_client.search(query=search_query, filters={"AND": memory_filters}, limit=10) if query_type != "general_chat" else asyncio.sleep(0, result={}),
+            self.sm_client.search(query=search_query, filters={"AND": memory_filters}, limit=5) if query_type != "general_chat" else asyncio.sleep(0, result={}),
             # Assistant knowledge search
             self.sm_client.search(query=search_query, filters={"AND": assistant_filters}, limit=5) if query_type != "general_chat" else asyncio.sleep(0, result={}),
             # Chat Assets search
@@ -109,7 +127,10 @@ Rules:
 
         results = await asyncio.gather(*tasks)
         
-        course_res, memory_res, assistant_res, chat_res, profile_res = results
+        course_res, focused_res, memory_res, assistant_res, chat_res, profile_res = results
+        
+        # Combine focused results into course_context
+        all_course_chunks = flatten_v3(course_res) + flatten_v3(focused_res)
 
         def flatten_v3(res):
             if not res or not isinstance(res, dict): return []
@@ -130,7 +151,7 @@ Rules:
             return all_chunks
 
         return {
-            "course_context": flatten_v3(course_res),
+            "course_context": all_course_chunks,
             "assistant_knowledge": flatten_v3(assistant_res),
             "chat_assets": flatten_v3(chat_res),
             "memories": flatten_v3(memory_res),

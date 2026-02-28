@@ -186,12 +186,15 @@ async def chat_stream(
             c_data = {}
             # 2. Retrieval
             if q_type != "general_chat":
-                yield f"data: EVENT:THINKING:Searching your academic vault...\n\n"
-                c_data = await retriever.retrieve_context(message, q_type, history=short_term_history, course_filter=course_id)
+                yield f"data: EVENT:THINKING:Searching your academic vault and focused documents...\n\n"
+                c_data = await retriever.retrieve_context(message, q_type, history=short_term_history, course_filter=course_id, material_id=material_id)
             else:
                 yield f"data: EVENT:THINKING:Personalizing response...\n\n"
-                c_data = await retriever.retrieve_context(message, "general_chat", history=short_term_history, course_filter=course_id)
+                c_data = await retriever.retrieve_context(message, "general_chat", history=short_term_history, course_filter=course_id, material_id=None)
             
+            # Additional grounding log
+            if material_id:
+                logger.info(f"[Chat] Focused retrieval active for material: {material_id}")
             # ENFORCE GROUNDING: If material_id provided, fetch its components
             if material_id:
                 # 1. Main Material
