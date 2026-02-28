@@ -57,9 +57,12 @@ export default function DriveSyncModal({ isOpen, onClose }: DriveSyncModalProps)
             await loadGapi();
             const g = window as any;
 
+            const docsView = new g.google.picker.DocsView()
+                .setIncludeFolders(true)
+                .setSelectFolderEnabled(true);
+
             const picker = new g.google.picker.PickerBuilder()
-                .addView(g.google.picker.ViewId.FOLDERS)
-                .addView(g.google.picker.ViewId.DOCS)
+                .addView(docsView)
                 .setOAuthToken(accessToken)
                 .setDeveloperKey("") // Optional: User should add API Key for better limits
                 .setCallback(async (data: any) => {
