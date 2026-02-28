@@ -333,7 +333,12 @@ export default function CoursePage() {
                                                                 {/* Card Actions */}
                                                                 <div className="flex items-center gap-3 pt-4">
                                                                     <button
-                                                                        onClick={(e) => { e.stopPropagation(); router.push(`/chat?query=${encodeURIComponent(`Tell me about this from ${course?.name}: ${item.title}`)}`); }}
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            const attList = (item.attachments || []).map((a: any) => a.title).join(', ');
+                                                                            const query = `Summarize this announcement from ${course?.name}: "${item.content || item.title}". ${attList ? `Also, analyze and summarize these attached documents: ${attList}.` : ''}`;
+                                                                            router.push(`/chat?query=${encodeURIComponent(query)}`);
+                                                                        }}
                                                                         className="px-6 py-3 glass-dark hover:bg-blue-600/10 border border-white/5 hover:border-blue-500/20 rounded-2xl text-xs font-black uppercase tracking-widest text-blue-400 transition-all flex items-center gap-2 cursor-pointer"
                                                                     >
                                                                         <Sparkles size={14} />
@@ -586,8 +591,12 @@ export default function CoursePage() {
                                             Open in Classroom
                                         </button>
                                         <button
-                                            onClick={() => router.push(`/chat?query=${encodeURIComponent(`Tell me more about "${selectedItem.title}" from the course "${course?.name || ''}"`)}`)}
-                                            className="px-6 py-3 glass-dark hover:bg-white/5 text-gray-400 hover:text-white font-bold rounded-xl transition-colors border border-white/5 cursor-pointer"
+                                            onClick={() => {
+                                                const attList = (selectedItem.attachments || []).map((a: any) => a.title).join(', ');
+                                                const query = `Summarize this "${selectedItem.title}" from ${course?.name}. ${attList ? `Also, analyze and summarize these attached documents: ${attList}.` : ''}`;
+                                                router.push(`/chat?query=${encodeURIComponent(query)}`);
+                                            }}
+                                            className="px-6 py-3 glass-dark hover:bg-white/5 text-gray-400 hover:text-white font-bold rounded-xl transition-all border border-white/5 cursor-pointer"
                                         >
                                             Ask AI About This
                                         </button>
