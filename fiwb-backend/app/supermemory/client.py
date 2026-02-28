@@ -28,7 +28,8 @@ class SupermemoryClient:
         self.client = httpx.AsyncClient(
             headers=self._headers,
             timeout=httpx.Timeout(30.0),
-            limits=httpx.Limits(max_connections=50, max_keepalive_connections=10)
+            limits=httpx.Limits(max_connections=50, max_keepalive_connections=10) 
+            
         )
 
     async def add_document(self, content: str, metadata: dict, title: str = None, description: str = None):

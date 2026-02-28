@@ -66,6 +66,8 @@ class MemoryAgent:
     async def synthesize_and_save(user_email: str, query: str, response: str, additional_context: dict = None, conversation_history: list = None):
         """Synthesize memory for user using shared scale-ready clients."""
         user_email = standardize_email(user_email)
+        user_name = user_email.split("@")[0].replace(".", " ").title()
+        
         openai_client = get_openai()
         sm_client = get_sm()
         
@@ -134,22 +136,22 @@ class MemoryAgent:
             await sm_client.add_document(
                 content=content_block,
                 metadata=metadata,
-                title=f"💭 {memory_data.get('title')}",
+                title=f"💭 [{user_name}'s Memory] {memory_data.get('title')}",
                 description=memory_data.get("summary")
             )
             
             # 4. Global Twin Evolution
             if learning.get('strengths') or learning.get('knowledge_gaps'):
-                await MemoryAgent._update_profile(user_email, learning.get('strengths', []), learning.get('knowledge_gaps', []), profile.get('learning_style'), profile.get('communication_preference'))
+                await MemoryAgent._update_profile(user_email, user_name, learning.get('strengths', []), learning.get('knowledge_gaps', []), profile.get('learning_style'), profile.get('communication_preference'))
             
         except Exception as e:
             print(f"⚠️ Memory Evolution Failed: {e}")
 
     @staticmethod
-    async def _update_profile(user_email, strengths, gaps, style, prefs):
+    async def _update_profile(user_email, user_name, strengths, gaps, style, prefs):
         sm_client = get_sm()
         try:
-            profile_content = f"""# User Portfolio Profile\nStrengths: {strengths}\nGaps: {gaps}\nStyle: {style}\nPrefs: {prefs}"""
+            profile_content = f"""# {user_name}'s Portfolio Profile\nStrengths: {strengths}\nGaps: {gaps}\nStyle: {style}\nPrefs: {prefs}"""
             metadata = {"user_id": user_email, "type": "user_profile", "strengths": strengths, "gaps": gaps}
-            await sm_client.add_document(content=profile_content, metadata=metadata, title=f"🧠 Intelligence Portfolio: {user_email}")
+            await sm_client.add_document(content=profile_content, metadata=metadata, title=f"🧠 {user_name}'s Portfolio")
         except: pass
