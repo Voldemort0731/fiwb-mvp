@@ -335,23 +335,7 @@ export default function CoursePage() {
                                                                     <button
                                                                         onClick={(e) => {
                                                                             e.stopPropagation();
-
-                                                                            const announcementText = item.content || item.title;
-                                                                            const attachments = (item.attachments || []);
-                                                                            const titles = attachments.map((a: any) => `"${a.title}"`).join(', ');
-
-                                                                            // Construct a powerful retrieval-focused command for the chatbot.
-                                                                            // This triggers the RAG system to find the actual indexed chunks for these specific titles.
-                                                                            let query = `I'm looking at this announcement from ${course?.name}: "${announcementText}".\n\n`;
-
-                                                                            if (attachments.length > 0) {
-                                                                                query += `Please find and summarize the full contents of the following attached documents from my repository using a deep search: ${titles}.\n\n`;
-                                                                                query += `Once found, explain how these documents relate to the professor's announcement and provide a consolidated summary of all action items.`;
-                                                                            } else {
-                                                                                query += `Please analyze this announcement and provide key takeaways.`;
-                                                                            }
-
-                                                                            router.push(`/chat?query=${encodeURIComponent(query)}&course_id=${courseId}`);
+                                                                            router.push(`/chat?material_id=${item.id}`);
                                                                         }}
                                                                         className="px-6 py-3 glass-dark hover:bg-blue-600/10 border border-white/5 hover:border-blue-500/20 rounded-2xl text-xs font-black uppercase tracking-widest text-blue-400 transition-all flex items-center gap-2 cursor-pointer"
                                                                     >
@@ -415,7 +399,7 @@ export default function CoursePage() {
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
-                                                                router.push(`/analysis/${item.id}`);
+                                                                router.push(`/chat?material_id=${item.id}`);
                                                             }}
                                                             className="px-4 py-2 glass-dark hover:bg-blue-600/10 border border-white/5 hover:border-blue-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest text-blue-400 transition-all flex items-center gap-2 opacity-0 group-hover:opacity-100 cursor-pointer"
                                                         >
@@ -607,7 +591,7 @@ export default function CoursePage() {
                                             Open in Classroom
                                         </button>
                                         <button
-                                            onClick={() => router.push(`/analysis/${selectedItem.id}`)}
+                                            onClick={() => router.push(`/chat?material_id=${selectedItem.id}`)}
                                             className="px-6 py-3 glass-dark hover:bg-white/5 text-gray-400 hover:text-white font-bold rounded-xl transition-all border border-white/5 cursor-pointer"
                                         >
                                             Ask AI About This

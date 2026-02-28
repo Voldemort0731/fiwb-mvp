@@ -1,212 +1,114 @@
 "use client";
-import Sidebar from "@/components/Sidebar";
-import { useState, useRef, useEffect, Suspense } from "react";
+
+import { useEffect, useState, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { Send, User, Bot, Sparkles, StopCircle, Paperclip, X, FileText, Image as ImageIcon, BookOpen, Quote, Cpu, Settings, Zap, ChevronRight, RefreshCw, Layers, Copy, Check, Reply } from "lucide-react";
+import {
+    Send, Paperclip, Cpu, Zap,
+    RefreshCw, ChevronRight, X, FileText,
+    Bot, User, MessageCircle, Trash2,
+    Check, BookOpen, Quote, Loader2
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import Sidebar from "@/components/Sidebar";
 import clsx from "clsx";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
-import rehypeKatex from "rehype-katex";
-import "katex/dist/katex.min.css";
-import { API_URL, standardize_email } from "@/utils/config";
+import { API_URL } from "@/utils/config";
 
-interface Source {
-    title: string;
-    display: string;
-    link?: string;
-    snippet?: string;
-    source_type?: string;
-}
+// --- HELPERS ---
+const standardize_email = (email: string | null) => {
+    if (!email) return "";
+    return email.trim().toLowerCase();
+};
 
-function MessageContent({ content, sources = [] }: { content: string; sources?: Source[] }) {
-    const [expandedSnippet, setExpandedSnippet] = useState<number | null>(null);
-
-    // 1. Parse Personal Reasoning (Handle typos like PERNALIZED)
-    const reasoningRegex = /\[(?:PERSONAL_REASONING|PERNALIZED_CONTEXT_USED)(?::\s*(.*?))?\]/i;
-    const reasoningMatch = content.match(reasoningRegex);
-    const hasPersonalReasoning = !!reasoningMatch;
-    const reasoningItems = reasoningMatch && reasoningMatch[1] ? reasoningMatch[1].split(",").map(s => s.trim()) : [];
-
-    // 2. Parse Exact Documents Referenced (with Page Support)
-    const docsRegex = /\[DOCUMENTS_REFERENCED(?::\s*(.*?))?\]/i;
-    const docsMatch = content.match(docsRegex);
-    const docItemsRaw = docsMatch && docsMatch[1] ? docsMatch[1].split(",").map(s => s.trim()) : [];
-
-    // Extract base titles and pages: "Syllabus [Page 1, 2]" -> { baseTitle: "Syllabus", pages: "1, 2" }
-    const docCitations = docItemsRaw.map(item => {
-        const pageMatch = item.match(/(.*?)\s*\[Page(?:s)?\s*(.*?)\]/i);
-        if (pageMatch) {
-            return {
-                baseTitle: pageMatch[1].trim(),
-                pages: pageMatch[2].trim(),
-                full: item
-            };
-        }
-        return { baseTitle: item, pages: null, full: item };
+const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = error => reject(error);
     });
+};
 
-    // 3. Clean Content
-    let cleanContent = content
-        .replace(reasoningRegex, "")
-        .replace(docsRegex, "")
-        .trim();
-
-    // 4. Source Attribution (legacy support)
-    const sourceRegex = /SOURCE: \[(.*?)\]/g;
-    const legacySources = Array.from(cleanContent.matchAll(sourceRegex)).map(m => m[1]);
-    let markdownContent = cleanContent.replace(sourceRegex, "").trim();
-
-    // Merge citations
-    const retrievedTitles = sources.map(s => s.title);
-    const allBaseSources = Array.from(new Set([
-        ...docCitations.map(d => d.baseTitle),
-        ...legacySources,
-        ...retrievedTitles
-    ])).filter(s => s && s.toLowerCase() !== "none");
-
-    // Normalize LaTeX delimiters for better rendering
-    let finalDisplayContent = markdownContent
-        .replace(/\\\(([\s\S]*?)\\\)/g, "$$$1$$")
-        .replace(/\\\[([\s\S]*?)\\\]/g, "$$$$$1$$$$")
-        .trim();
-
-    if (!finalDisplayContent) finalDisplayContent = content.trim();
+function MessageContent({ content, sources, reasoning }: { content: string, sources?: any[], reasoning?: string }) {
+    // Parse numerical citations [1], [2]...
+    const docCitations = content.match(/\[(\d+)\]/g)?.map(c => {
+        const num = c.replace(/[\[\]]/g, '');
+        // Find corresponding source title if it exists in the reasoning or content
+        // This is a heuristic - in a real app, the LLM should return structured metadata
+        return { num, baseTitle: `Source ${num}`, pages: "" };
+    }) || [];
 
     return (
-        <div className="space-y-6 w-full">
-            {hasPersonalReasoning && (
-                <div className="flex flex-col gap-3 mb-6 p-4 rounded-2xl bg-gradient-to-br from-pink-500/10 to-transparent border border-pink-500/10 shadow-inner">
-                    <div className="flex items-center gap-2 mb-1">
-                        <div className="p-1 px-2 glass bg-pink-500 rounded text-[9px] font-black text-white uppercase tracking-widest shadow-lg shadow-pink-500/20">
-                            Neural Inference
-                        </div>
-                        <span className="text-[10px] font-bold text-pink-600 dark:text-pink-400 opacity-70">Cognitive Nodes Active</span>
+        <div className="space-y-4">
+            {reasoning && (
+                <div className="p-4 rounded-2xl bg-blue-500/5 border border-blue-500/10 mb-4 italic text-xs text-blue-400 font-medium">
+                    <div className="flex items-center gap-2 mb-2 font-black uppercase tracking-widest opacity-60">
+                        <Cpu size={12} />
+                        Neural Reasoning Path
                     </div>
-                    {reasoningItems.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                            {reasoningItems.map((item, idx) => (
-                                <div key={idx} className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/40 dark:bg-pink-500/10 border border-pink-500/20 shadow-sm transition-transform hover:scale-105">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-pink-500 animate-pulse" />
-                                    <span className="text-[10px] font-bold text-pink-700 dark:text-pink-300 uppercase tracking-wide">
-                                        {item}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <p className="text-[10px] text-pink-600/60 dark:text-pink-400/60 font-medium italic">Synthesizing personalized academic context...</p>
-                    )}
+                    {reasoning}
                 </div>
             )}
 
-            <div className="markdown-content prose dark:prose-invert prose-blue max-w-none">
+            <div className="prose prose-invert max-w-none text-sm font-medium leading-relaxed">
                 <ReactMarkdown
-                    remarkPlugins={[remarkGfm, remarkMath]}
-                    rehypePlugins={[rehypeKatex]}
+                    remarkPlugins={[remarkGfm]}
                     components={{
-                        p: ({ children }) => <p className="mb-4 last:mb-0 leading-relaxed text-gray-900 dark:text-gray-200 font-medium">{children}</p>,
-                        ul: ({ children }) => <ul className="list-disc ml-6 mb-4 space-y-2 text-gray-900 dark:text-gray-200 font-medium">{children}</ul>,
-                        ol: ({ children }) => <ol className="list-decimal ml-6 mb-4 space-y-2 text-gray-900 dark:text-gray-200 font-medium">{children}</ol>,
-                        h1: ({ children }) => <h1 className="text-2xl font-bold mb-4 text-gray-900 dark:text-white tracking-tight">{children}</h1>,
-                        h2: ({ children }) => <h2 className="text-xl font-bold mb-3 mt-6 text-gray-900 dark:text-white tracking-tight">{children}</h2>,
-                        h3: ({ children }) => <h3 className="text-lg font-bold mb-2 mt-4 text-gray-900 dark:text-white tracking-tight">{children}</h3>,
-                        code: ({ node, ...props }) => (
-                            <code className="bg-white/5 px-1.5 py-0.5 rounded text-blue-400 text-[13px] font-mono border border-white/5" {...props} />
-                        ),
-                        pre: ({ children }) => (
-                            <pre className="bg-black/40 p-5 rounded-2xl border border-white/5 overflow-x-auto my-6 shadow-xl scrollbar-thin">
-                                {children}
-                            </pre>
-                        ),
+                        p: ({ children }) => <p className="mb-4 last:mb-0">{children}</p>,
+                        ul: ({ children }) => <ul className="list-disc ml-4 mb-4 space-y-2">{children}</ul>,
                     }}
                 >
-                    {finalDisplayContent}
+                    {content.replace(/\[(\d+)\]/g, ' [[$1]] ')}
                 </ReactMarkdown>
             </div>
 
-            {allBaseSources.length > 0 && (
-                <div className="pt-10 border-t border-gray-100 dark:border-white/5 mt-10 space-y-5">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-blue-500/10 flex items-center justify-center border border-blue-500/20 shadow-lg shadow-blue-500/5">
-                                <Layers size={14} className="text-blue-500" />
-                            </div>
-                            <div>
-                                <h5 className="text-[11px] font-black uppercase tracking-[0.25em] text-gray-400">REFERRED DOCS</h5>
-                                <p className="text-[9px] text-gray-400/60 font-medium">Direct documentation access</p>
-                            </div>
-                        </div>
+            {sources && sources.length > 0 && (
+                <div className="mt-6 pt-6 border-t border-white/5 space-y-4">
+                    <div className="flex items-center gap-2 mb-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+                        <span className="text-[10px] font-black uppercase text-blue-500 tracking-widest">Grounding Context</span>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                        {allBaseSources
-                            .filter(baseTitle => {
-                                const matched = sources.find(s => s.title.toLowerCase() === baseTitle.toLowerCase());
-                                return matched && matched.link;
-                            })
-                            .map((baseTitle, idx) => {
-                                const matchedSource = sources.find(s => s.title.toLowerCase() === baseTitle.toLowerCase());
-                                const citation = docCitations.find(d => d.baseTitle.toLowerCase() === baseTitle.toLowerCase());
-                                const displayTitle = matchedSource?.display || baseTitle;
-                                const link = matchedSource?.link;
-                                const pages = citation?.pages;
-
-                                return (
-                                    <motion.div
-                                        key={idx}
-                                        initial={{ opacity: 0, scale: 0.95 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        transition={{ delay: idx * 0.03 }}
-                                        whileHover={{ y: -2 }}
-                                        className="group/source h-full"
-                                    >
-                                        <div className="h-full flex flex-col p-3 rounded-2xl glass-dark border border-gray-200/50 dark:border-white/5 bg-white/70 dark:bg-black/60 hover:border-blue-500/40 hover:bg-blue-500/[0.02] transition-all duration-300 shadow-lg shadow-black/5">
-                                            <div className="flex items-center justify-between mb-2">
-                                                <div className="p-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                                                    <FileText size={14} className="text-blue-500" />
-                                                </div>
-                                                {pages && (
-                                                    <span className="text-[9px] font-black text-blue-500/80 bg-blue-500/5 px-1.5 py-0.5 rounded border border-blue-500/10 uppercase">Pg {pages}</span>
-                                                )}
-                                            </div>
-
-                                            {link ? (
-                                                <a href={link} target="_blank" rel="noopener noreferrer" className="block group/title">
-                                                    <h4 className="text-[11px] font-bold text-gray-900 dark:text-gray-100 line-clamp-2 mb-2 leading-tight group-hover/title:text-blue-600 dark:group-hover/title:text-blue-400 transition-colors">
-                                                        {displayTitle}
-                                                    </h4>
-                                                </a>
-                                            ) : (
-                                                <h4 className="text-[11px] font-bold text-gray-900 dark:text-gray-100 line-clamp-2 mb-2 leading-tight">
-                                                    {displayTitle}
-                                                </h4>
-                                            )}
-
-                                            <div className="mt-auto pt-2 border-t border-gray-100 dark:border-white/5 flex items-center justify-between">
-                                                {link ? (
-                                                    <a
-                                                        href={link}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="flex items-center gap-1.5 text-[9px] font-black text-blue-500 uppercase tracking-wider hover:text-blue-600 transition-colors"
-                                                    >
-                                                        <BookOpen size={10} />
-                                                        View Original
-                                                    </a>
-                                                ) : (
-                                                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Legacy Asset</span>
-                                                )}
-                                                <div className="flex items-center gap-1">
-                                                    <div className="w-4 h-4 rounded-full bg-blue-500/10 flex items-center justify-center">
-                                                        <Check size={8} className="text-blue-500" />
-                                                    </div>
-                                                </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {sources.map((source, idx) => {
+                            const displayTitle = source.display || source.title;
+                            return (
+                                <motion.div
+                                    key={idx}
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ delay: idx * 0.03 }}
+                                    whileHover={{ y: -2 }}
+                                    className="group/source h-full"
+                                >
+                                    <div className="h-full flex flex-col p-3 rounded-2xl glass-dark border border-white/5 bg-black/40 hover:border-blue-500/40 hover:bg-blue-500/[0.02] transition-all duration-300">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <div className="p-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                                                <FileText size={14} className="text-blue-500" />
                                             </div>
                                         </div>
-                                    </motion.div>
-                                );
-                            })}
+                                        <h4 className="text-[11px] font-bold text-gray-100 line-clamp-2 mb-2 leading-tight">
+                                            {displayTitle}
+                                        </h4>
+                                        <div className="mt-auto pt-2 border-t border-white/5 flex items-center justify-between">
+                                            {source.link ? (
+                                                <a
+                                                    href={source.link}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="flex items-center gap-1.5 text-[9px] font-black text-blue-500 uppercase tracking-wider hover:text-blue-600 transition-colors"
+                                                >
+                                                    <BookOpen size={10} />
+                                                    View Original
+                                                </a>
+                                            ) : (
+                                                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Internal Reference</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </motion.div>
+                            );
+                        })}
                     </div>
                 </div>
             )}
@@ -225,8 +127,16 @@ function ChatBody() {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const searchParams = useSearchParams();
+    const initializedRef = useRef(false);
+
+    // Viewer State
+    const [viewerMaterial, setViewerMaterial] = useState<any>(null);
+    const [activeAttachment, setActiveAttachment] = useState<any>(null);
+    const iframeRef = useRef<HTMLIFrameElement>(null);
 
     const [isAutoScrolling, setIsAutoScrolling] = useState(true);
+    const [thinkingStep, setThinkingStep] = useState<string | null>(null);
+    const [replyingTo, setReplyingTo] = useState<any>(null);
 
     const scrollToBottom = () => {
         if (isAutoScrolling) {
@@ -287,7 +197,7 @@ function ChatBody() {
     };
 
     const handleDeleteThread = async (id: string) => {
-        if (confirm("Delete this conversation?")) {
+        if (confirm("Permanently delete this neural thread?")) {
             const email = standardize_email(localStorage.getItem("user_email"));
             await fetch(`${API_URL}/api/chat/threads/${id}?user_email=${email}`, { method: "DELETE" });
             if (activeThreadId === id) {
@@ -297,111 +207,6 @@ function ChatBody() {
             fetchThreads();
         }
     };
-
-    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            setSelectedFile(file);
-            if (file.type.startsWith("image/")) {
-                setPreviewUrl(URL.createObjectURL(file));
-            } else {
-                setPreviewUrl(null);
-            }
-        }
-    };
-
-    const handlePaste = (e: React.ClipboardEvent) => {
-        const items = e.clipboardData.items;
-        for (let i = 0; i < items.length; i++) {
-            if (items[i].kind === 'file') {
-                const blob = items[i].getAsFile();
-                if (blob) {
-                    const isImage = blob.type.startsWith("image/");
-                    const file = new File([blob], blob.name || `pasted-${Date.now()}.${isImage ? 'png' : 'file'}`, { type: blob.type });
-                    setSelectedFile(file);
-                    if (isImage) {
-                        setPreviewUrl(URL.createObjectURL(blob));
-                    } else {
-                        setPreviewUrl(null);
-                    }
-                    e.preventDefault();
-                }
-            }
-        }
-    };
-
-    const removeFile = () => {
-        setSelectedFile(null);
-        setPreviewUrl(null);
-        if (fileInputRef.current) fileInputRef.current.value = "";
-    };
-
-    const fileToBase64 = (file: File): Promise<string> => {
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = error => reject(error);
-        });
-    };
-
-    const initializedRef = useRef(false);
-
-    const [thinkingStep, setThinkingStep] = useState<string | null>(null);
-    const [streamingActive, setStreamingActive] = useState(false);
-    const [foundSources, setFoundSources] = useState<Source[]>([]);
-
-    // --- NEW FEATURES STATE ---
-    const [replyingTo, setReplyingTo] = useState<any>(null);
-    const [selectionPopup, setSelectionPopup] = useState<{ x: number, y: number, text: string } | null>(null);
-    const [copiedId, setCopiedId] = useState<string | null>(null);
-
-    // Track if user has scrolled up
-    const handleScroll = (e: any) => {
-        const threshold = 100;
-        const { scrollTop, scrollHeight, clientHeight } = e.target;
-        const atBottom = scrollHeight - scrollTop - clientHeight < threshold;
-        setIsAutoScrolling(atBottom);
-    };
-
-    const handleCopy = (text: string) => {
-        navigator.clipboard.writeText(text);
-        setCopiedId(text);
-        setTimeout(() => setCopiedId(null), 2000);
-    };
-
-    const handleSelection = () => {
-        const selection = window.getSelection();
-        // Check if selection exists and is not empty
-        if (!selection || selection.isCollapsed || selection.toString().trim().length === 0) {
-            setSelectionPopup(null);
-            return;
-        }
-
-        const range = selection.getRangeAt(0);
-        const rect = range.getBoundingClientRect();
-
-        // Show popup ONLY if selection is visible in viewport
-        if (rect.width > 0 && rect.height > 0) {
-            setSelectionPopup({
-                x: rect.left + (rect.width / 2) - 60, // Center (approx 120px width)
-                y: rect.top - 50, // Position above the selection
-                text: selection.toString()
-            });
-        }
-    };
-
-    // Close selection popup on click outside
-    useEffect(() => {
-        const closePopup = (e: MouseEvent) => {
-            // If clicking the popup itself, don't close
-            // (Logic simplified: rely on button clicks)
-            if ((e.target as HTMLElement).closest('button')) return;
-            setSelectionPopup(null);
-        };
-        document.addEventListener('mousedown', closePopup);
-        return () => document.removeEventListener('mousedown', closePopup);
-    }, []);
 
     const sendMessage = async (forcedContent?: string) => {
         const contentToUse = typeof forcedContent === "string" ? forcedContent : input;
@@ -417,14 +222,7 @@ function ChatBody() {
             } catch (e) { console.error("Error converting file", e); }
         }
 
-        // --- HANDLE REPLY CONTEXT ---
-        let finalUserMsg = contentToUse;
-        if (replyingTo) {
-            finalUserMsg = `[RE: ${replyingTo.content.substring(0, 50)}...] ${contentToUse}`;
-            setReplyingTo(null);
-        }
-
-        const userMsg = finalUserMsg || (currentFile ? `Attached: ${currentFile.name}` : "");
+        const userMsg = contentToUse || (currentFile ? `Attached: ${currentFile.name}` : "");
         setInput("");
         setSelectedFile(null);
         setPreviewUrl(null);
@@ -439,8 +237,6 @@ function ChatBody() {
 
         setIsLoading(true);
         setThinkingStep("Initializing Neural Link...");
-        setStreamingActive(false);
-        setFoundSources([]);
 
         try {
             const email = standardize_email(localStorage.getItem("user_email") || "");
@@ -448,108 +244,55 @@ function ChatBody() {
             formData.append("message", userMsg);
             formData.append("user_email", email);
             formData.append("thread_id", activeThreadId);
+            if (viewerMaterial?.course_id) formData.append("course_id", viewerMaterial.course_id);
+            if (viewerMaterial) formData.append("query_type", "notebook_analysis");
 
-            const chatHistory = messages.slice(-5).map(m => ({ role: m.role, content: m.content }));
-            formData.append("history", JSON.stringify(chatHistory));
-            if (currentFile) formData.append("file", currentFile);
+            const response = await fetch(`${API_URL}/api/chat/stream`, {
+                method: "POST",
+                body: formData
+            });
 
-            // Pass course_id if present in URL
-            const courseId = searchParams.get("course_id");
-            if (courseId) formData.append("course_id", courseId);
-
-            const response = await fetch(`${API_URL}/api/chat/stream`, { method: "POST", body: formData });
-
-            if (!response.ok) {
-                // Try to read error message from body
-                let errorMsg = "Neural Link Connection Failed";
-                try {
-                    const errorJson = await response.json();
-                    if (errorJson.detail) errorMsg = errorJson.detail;
-                } catch (e) { }
-
-                throw new Error(errorMsg);
-            }
-
-            if (!response.body) throw new Error("No neural data stream received.");
-
-            const reader = response.body.getReader();
+            const reader = response.body?.getReader();
             const decoder = new TextDecoder();
-            let aiMessage = "";
-            let streamStarted = false;
-            let buffer = "";
+            let accumulatedContent = "";
+            let accumulatedReasoning = "";
+            let accumulatedSources: any[] = [];
 
-            let accumulatedSources: Source[] = []; // Local source tracker
+            setMessages(prev => [...prev, { role: "assistant", content: "", thinking: true }]);
 
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) {
-                    fetchThreads();
-                    break;
-                }
+            while (reader) {
+                const { value, done } = await reader.read();
+                if (done) break;
 
-                buffer += decoder.decode(value, { stream: true });
-                // We split by \n\n as per SSE convention, but some chunks might be plain text or JSON
-                // The current backend sends distinct lines prefixed with "data: "
-                let lines = buffer.split("\n\n");
-                // Keep the last chunk as it might be incomplete
-                buffer = lines.pop() || "";
+                const chunk = decoder.decode(value);
+                const lines = chunk.split("\n");
 
                 for (const line of lines) {
-                    const trimmedLine = line.trim();
-                    if (!trimmedLine.startsWith("data: ")) continue;
-
-                    const data = trimmedLine.slice(6);
-
-                    if (data.startsWith("THREAD_ID:")) {
-                        const newId = data.replace("THREAD_ID:", "").trim();
-                        if (activeThreadId === "new") {
-                            setActiveThreadId(newId);
-                            fetchThreads();
-                        }
-                    } else if (data.startsWith("EVENT:THINKING:")) {
-                        // ONLY update the thinkingStep state — never insert into messages
-                        const step = data.replace("EVENT:THINKING:", "").trim();
-                        setThinkingStep(step);
-
-                    } else if (data.startsWith("EVENT:SOURCES:")) {
+                    if (line.startsWith("data: THREAD_ID:")) {
+                        const newId = line.replace("data: THREAD_ID:", "").trim();
+                        setActiveThreadId(newId);
+                        fetchThreads();
+                    } else if (line.startsWith("data: SOURCE:")) {
                         try {
-                            const found = JSON.parse(data.replace("EVENT:SOURCES:", "").trim());
-                            accumulatedSources = found;
-                            setFoundSources(found);
-                        } catch (e) { console.error("Error parsing sources", e); }
-
-                    } else {
-                        // Regular token content — first real token clears the thinking card
-                        if (!streamStarted) {
-                            streamStarted = true;
-                            setStreamingActive(true);
-                            setThinkingStep(null);
-                            setMessages(prev => [...prev, {
-                                role: "assistant",
-                                content: "",
-                                sources: accumulatedSources,
-                                isThinking: false
-                            }]);
+                            const sourceData = JSON.parse(line.replace("data: SOURCE:", ""));
+                            accumulatedSources.push(sourceData);
+                        } catch (e) { }
+                    } else if (line.startsWith("data: REASONING:")) {
+                        accumulatedReasoning += line.replace("data: REASONING:", "");
+                    } else if (line.startsWith("data: ")) {
+                        const content = line.replace("data: ", "");
+                        if (content.startsWith("EVENT:")) {
+                            setThinkingStep(content.replace("EVENT:", "").trim());
+                            continue;
                         }
-
-                        // Parse token from raw or JSON
-                        let token = data;
-                        if (data.startsWith("{") && data.endsWith("}")) {
-                            try {
-                                const parsed = JSON.parse(data);
-                                if (parsed.token) token = parsed.token;
-                            } catch (e) { }
-                        }
-
-                        aiMessage += token;
+                        accumulatedContent += content;
                         setMessages(prev => {
                             const newMsgs = [...prev];
                             const last = { ...newMsgs[newMsgs.length - 1] };
-                            if (last.role === "assistant") {
-                                last.content = aiMessage;
-                                last.sources = accumulatedSources; // Ensure sources are kept
-                                last.isThinking = false; // Safety flip
-                            }
+                            last.content = accumulatedContent;
+                            last.reasoning = accumulatedReasoning;
+                            last.sources = accumulatedSources;
+                            last.thinking = false;
                             newMsgs[newMsgs.length - 1] = last;
                             return newMsgs;
                         });
@@ -558,36 +301,40 @@ function ChatBody() {
             }
         } catch (e: any) {
             console.error("Stream Error:", e);
-            const errorText = e.message || "Connection Error. Neural Link Severed.";
-            setMessages(prev => [...prev, { role: "system", content: errorText }]);
         } finally {
             setIsLoading(false);
             setThinkingStep(null);
-            setStreamingActive(false);
         }
     };
 
     useEffect(() => {
-        // Handle incoming query params from dashboard or other links
         const q = searchParams.get("q") || searchParams.get("query");
-        if (q && !initializedRef.current) {
-            initializedRef.current = true;
-            setActiveThreadId("new");
-            setMessages([]);
-            sendMessage(q);
+        const materialId = searchParams.get("material_id");
 
-            // Clean up URL but preserve thread context if needed
-            // (We keep the course_id for the first message send)
-            const url = new URL(window.location.href);
-            url.searchParams.delete("q");
-            url.searchParams.delete("query");
-            // url.searchParams.delete("course_id"); // Keep it for refreshing? No, let's keep url clean.
-            window.history.replaceState({}, "", url);
+        if (!initializedRef.current) {
+            if (q) {
+                initializedRef.current = true;
+                sendMessage(q);
+            } else if (materialId) {
+                initializedRef.current = true;
+                const fetchAnalysisMaterial = async () => {
+                    const email = standardize_email(localStorage.getItem("user_email"));
+                    try {
+                        const res = await fetch(`${API_URL}/api/courses/material/${materialId}?user_email=${email}`);
+                        const data = await res.json();
+                        setViewerMaterial(data);
+                        const firstDoc = (data.attachments || [])[0];
+                        setActiveAttachment(firstDoc);
+                        sendMessage(`Analyze and summarize this: "${data.title}". Give an executive summary and suggested inquiries.`);
+                    } catch (e) { }
+                };
+                fetchAnalysisMaterial();
+            }
         }
     }, [searchParams]);
 
     return (
-        <div className="flex h-screen w-full bg-white dark:bg-[#050505] text-gray-900 dark:text-white font-sans selection:bg-blue-500/30 overflow-hidden transition-colors duration-500">
+        <div className="flex h-screen w-full bg-white dark:bg-[#050505] text-gray-900 dark:text-white overflow-hidden">
             <Sidebar
                 threads={threads}
                 activeThreadId={activeThreadId}
@@ -595,366 +342,102 @@ function ChatBody() {
                 onNewChat={() => { setActiveThreadId("new"); setMessages([]); }}
                 onDeleteThread={handleDeleteThread}
             />
-            <main
-                className="flex-1 flex flex-col relative bg-dot-pattern"
-                onScroll={handleScroll}
-            >
-                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-blue-600/5 rounded-full blur-[120px] pointer-events-none" />
-                <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-purple-600/5 rounded-full blur-[120px] pointer-events-none" />
 
-                <header className="px-8 py-5 glass-dark border-b border-gray-200 dark:border-white/5 flex justify-between items-center relative z-20">
-                    <div className="flex items-center gap-4">
-                        <div className="w-11 h-11 glass-card rounded-2xl flex items-center justify-center border border-gray-200 dark:border-white/10 shadow-2xl">
-                            <Cpu size={22} className="text-blue-500 dark:text-blue-400" />
-                        </div>
-                        <div>
-                            <h2 className="text-lg font-black tracking-tight flex items-center gap-2">
-                                {threads.find(t => t.id === activeThreadId)?.title || (activeThreadId === 'new' ? 'Neural Workspace' : 'Loading Chat...')}
-                            </h2>
-                            <p className="text-[9px] font-black uppercase tracking-widest text-gray-700 dark:text-gray-500">Session: {activeThreadId === 'new' ? 'Uninitialized' : activeThreadId.slice(0, 8)}</p>
-                        </div>
-                    </div>
-                </header>
-
-                <div className="flex-1 overflow-y-auto p-8 space-y-8 scrollbar-premium relative z-10 scroll-smooth" onMouseUp={handleSelection}>
-                    {messages.length === 0 ? (
-                        <div className="h-full flex flex-col items-center justify-center text-center space-y-8">
-                            <motion.div
-                                initial={{ scale: 0.9, opacity: 0 }}
-                                animate={{ scale: 1, opacity: 1 }}
-                                className="w-24 h-24 glass-card rounded-3xl flex items-center justify-center border border-white/10 shadow-2xl animate-float"
-                            >
-                                <Zap size={48} className="text-blue-500" />
-                            </motion.div>
-                            <div className="max-w-md space-y-3">
-                                <h3 className="text-2xl font-black tracking-tight text-gray-900 dark:text-white">Neural Interface Ready</h3>
-                                <p className="text-gray-800 dark:text-gray-500 font-semibold leading-relaxed">
-                                    Your personal AI Chatbot is online. Ask about course materials, upcoming labs, or synthesize a summary.
-                                </p>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3 max-w-lg">
-                                {["Summarize Recent Labs", "Upcoming Assignments", "Analyze Course Materials", "Study Plan Generation"].map(q => (
-                                    <button
-                                        key={q}
-                                        onClick={() => setInput(q)}
-                                        className="px-5 py-2.5 glass-card border border-gray-200 dark:border-white/5 text-[10px] uppercase tracking-widest font-black text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-white hover:border-blue-500/30 transition-all hover:bg-gray-50 dark:hover:bg-white/5"
-                                    >
-                                        {q}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="space-y-8">
-                            {messages.map((msg, i) => (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={i}
-                                    className={clsx("flex flex-col max-w-[90%] lg:max-w-[80%] space-y-2 group/message", msg.role === "user" ? "ml-auto items-end" : "items-start")}
-                                >
-                                    <div className={clsx(
-                                        "px-6 py-4 rounded-[1.5rem] shadow-2xl relative overflow-hidden transition-colors duration-500",
-                                        msg.role === "user"
-                                            ? "bg-white/5 backdrop-blur-xl border border-white/10 text-white font-medium rounded-tr-none shadow-lg shadow-black/30"
-                                            : "glass-dark border border-gray-200 dark:border-white/5 rounded-tl-none font-medium text-gray-900 dark:text-gray-200 bg-white dark:bg-black/40 shadow-xl shadow-gray-200/50 dark:shadow-none"
-                                    )}>
-                                        {msg.attachment && msg.attachment_type?.startsWith('image/') && (
-                                            <div className="mb-4 -mx-2 -mt-2">
-                                                <img src={msg.attachment} alt="Attachment" className="rounded-xl w-full max-h-[400px] object-cover border border-white/10" />
-                                            </div>
-                                        )}
-                                        {msg.attachment && !msg.attachment_type?.startsWith('image/') && (
-                                            <div className="mb-4 bg-gray-100 dark:bg-white/10 p-3 rounded-xl flex items-center gap-3 border border-gray-200 dark:border-white/10">
-                                                <div className="w-10 h-10 bg-gray-200 dark:bg-white/20 rounded-lg flex items-center justify-center">
-                                                    <FileText size={20} className="text-blue-600 dark:text-white" />
-                                                </div>
-                                                <div className="flex flex-col overflow-hidden">
-                                                    <span className="text-sm font-bold truncate text-gray-900 dark:text-white">{msg.file_name || "Attachment"}</span>
-                                                    <span className="text-[10px] opacity-70 uppercase tracking-widest text-gray-700 dark:text-gray-300">File Transferred</span>
-                                                </div>
-                                            </div>
-                                        )}
-
-                                        {msg.isThinking ? (
-                                            <div className="flex flex-col gap-4 py-2">
-                                                <div className="flex items-center gap-3">
-                                                    <RefreshCw size={14} className="text-blue-500 animate-spin" />
-                                                    <span className="text-xs font-bold text-blue-500 animate-pulse">{msg.content || "Neural Synthesis Active..."}</span>
-                                                </div>
-                                                {msg.sources && msg.sources.length > 0 && (
-                                                    <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100 dark:border-white/5">
-                                                        {msg.sources.slice(0, 3).map((s: any, idx: number) => (
-                                                            <div key={idx} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-blue-500/5 border border-blue-500/10 text-[9px] font-bold text-blue-500/70">
-                                                                <BookOpen size={9} />
-                                                                <span className="truncate max-w-[100px]">{s.title}</span>
-                                                            </div>
-                                                        ))}
-                                                        {msg.sources.length > 3 && (
-                                                            <span className="text-[9px] font-bold text-gray-400 mt-1">+{msg.sources.length - 3} more sources</span>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ) : (
-                                            <MessageContent content={msg.content} sources={msg.sources} />
-                                        )}
-                                    </div>
-                                    <div className="flex items-center gap-2 px-2 opacity-0 group-hover/message:opacity-100 transition-opacity">
-
-                                        <button
-                                            onClick={() => handleCopy(msg.content)}
-                                            className="p-1 hover:bg-gray-100 dark:hover:bg-white/10 rounded text-gray-500 hover:text-blue-500 transition-colors"
-                                            title="Copy to clipboard"
-                                        >
-                                            {copiedId === msg.content ? <Check size={12} /> : <Copy size={12} />}
-                                        </button>
-
-                                        <button
-                                            onClick={() => setReplyingTo(msg)}
-                                            className="p-1 hover:bg-gray-100 dark:hover:bg-white/10 rounded text-gray-500 hover:text-blue-500 transition-colors"
-                                            title="Reply to message"
-                                        >
-                                            <Reply size={12} />
-                                        </button>
-                                    </div>
-                                </motion.div>
-                            ))}
-                        </div>
-                    )}
-
-
-                    {/* Standalone Thinking indicator (Pre-stream phase) */}
-                    {isLoading && !streamingActive && (
+            <main className="flex-1 flex overflow-hidden relative">
+                <AnimatePresence>
+                    {viewerMaterial && (
                         <motion.div
-                            key="thinking-card"
-                            initial={{ opacity: 0, y: 12 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.25 }}
-                            className="flex flex-col items-start max-w-[90%] lg:max-w-[75%] mb-4 mt-8"
+                            initial={{ width: 0, opacity: 0 }}
+                            animate={{ width: "60%", opacity: 1 }}
+                            exit={{ width: 0, opacity: 0 }}
+                            className="h-full border-r border-white/5 flex flex-col bg-[#0a0a0a]"
                         >
-                            <div className="w-full bg-white dark:bg-[#0a0a0f] border border-blue-500/20 rounded-[1.75rem] p-5 shadow-2xl shadow-blue-500/5 relative overflow-hidden">
-                                {/* Animated top border */}
-                                <div className="absolute top-0 left-0 h-[2px] w-full overflow-hidden rounded-t-[1.75rem]">
-                                    <motion.div
-                                        className="h-full bg-gradient-to-r from-transparent via-blue-500 to-transparent w-[60%]"
-                                        animate={{ x: ["-100%", "250%"] }}
-                                        transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}
-                                    />
-                                </div>
-
-                                {/* Header */}
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className="relative w-8 h-8 rounded-xl bg-blue-600/10 flex items-center justify-center border border-blue-500/20">
-                                        <Sparkles size={15} className="text-blue-500" />
-                                        <motion.div
-                                            className="absolute inset-0 rounded-xl bg-blue-500/10"
-                                            animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0, 0.5] }}
-                                            transition={{ duration: 2, repeat: Infinity }}
-                                        />
+                            <div className="h-14 border-b border-white/5 flex items-center justify-between px-6 bg-black/40 backdrop-blur-xl">
+                                <span className="text-[10px] font-black uppercase text-gray-400">Analysis: <span className="text-white ml-2">{viewerMaterial.title}</span></span>
+                                <button onClick={() => setViewerMaterial(null)} className="p-2 hover:bg-white/5 rounded-lg text-gray-500 hover:text-white"><X size={18} /></button>
+                            </div>
+                            <div className="flex-1 bg-white relative">
+                                {activeAttachment ? (
+                                    <iframe src={activeAttachment.url.replace('/view', '/preview')} className="w-full h-full border-none" />
+                                ) : (
+                                    <div className="h-full flex items-center justify-center p-12 text-center bg-[#0a0a0a]">
+                                        <div className="max-w-md">
+                                            <FileText size={40} className="mx-auto text-gray-600 mb-4" />
+                                            <p className="text-gray-400 text-xs font-bold leading-relaxed">{viewerMaterial.content}</p>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em]">Neural Engine</p>
-                                        <p className="text-xs font-bold text-gray-900 dark:text-white">{thinkingStep || "Processing..."}</p>
-                                    </div>
-                                </div>
-
-                                {/* Step Pipeline */}
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    {[
-                                        { label: "Classifying", match: ["Classifying", "intent"] },
-                                        { label: "Retrieving", match: ["Searching", "Personalizing"] },
-                                        { label: "Broadcasting", match: ["Broadcasting"] },
-                                        { label: "Synthesizing", match: ["Synthesizing"] },
-                                    ].map((step, i) => {
-                                        const stepOrder = ["Classifying", "Retrieving", "Broadcasting", "Synthesizing"];
-                                        const activeIdx = stepOrder.findIndex((_, idx) =>
-                                            [["Classifying", "intent"], ["Searching", "Personalizing"], ["Broadcasting"], ["Synthesizing"]][idx].some(kw => thinkingStep?.includes(kw))
-                                        );
-                                        const isActive = step.match.some(kw => thinkingStep?.includes(kw));
-                                        const isDone = i < activeIdx;
-                                        return (
-                                            <div key={i} className="flex items-center gap-2">
-                                                <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all duration-500 ${isActive ? "bg-blue-500 text-white shadow-lg shadow-blue-500/30"
-                                                    : isDone ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20"
-                                                        : "bg-gray-100 dark:bg-white/5 text-gray-400"
-                                                    }`}>
-                                                    {isDone ? <Check size={9} /> : isActive ? (
-                                                        <motion.div
-                                                            className="w-2 h-2 rounded-full bg-white"
-                                                            animate={{ scale: [1, 1.4, 1] }}
-                                                            transition={{ duration: 0.8, repeat: Infinity }}
-                                                        />
-                                                    ) : <div className="w-1.5 h-1.5 rounded-full bg-gray-300 dark:bg-white/20" />}
-                                                    {step.label}
-                                                </div>
-                                                {i < 3 && <div className={`w-4 h-px transition-colors duration-500 ${isDone || isActive ? "bg-blue-400/50" : "bg-gray-200 dark:bg-white/5"}`} />}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-
-                                {/* Pulsing dots */}
-                                <div className="flex items-center gap-1.5 mt-4">
-                                    {[0, 1, 2].map(i => (
-                                        <motion.div
-                                            key={i}
-                                            className="w-1.5 h-1.5 rounded-full bg-blue-400"
-                                            animate={{ opacity: [0.2, 1, 0.2], y: [0, -3, 0] }}
-                                            transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
-                                        />
-                                    ))}
-                                    <span className="text-[10px] text-gray-400 font-medium ml-1">Processing...</span>
-                                </div>
+                                )}
                             </div>
                         </motion.div>
                     )}
+                </AnimatePresence>
 
-                    <div ref={messagesEndRef} />
-
-                    {/* Selection Popup */}
-                    <AnimatePresence>
-                        {selectionPopup && (
-                            <motion.div
-                                initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.9 }}
-                                style={{
-                                    position: 'fixed',
-                                    left: selectionPopup.x,
-                                    top: selectionPopup.y,
-                                    zIndex: 9999,
-                                    pointerEvents: 'auto'
-                                }}
-                                className="flex gap-1 bg-white dark:bg-black rounded-full shadow-2xl p-1 border border-gray-200 dark:border-white/10"
-                            >
-                                <button
-                                    onMouseDown={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        setInput(`Explain this: "${selectionPopup.text}"`);
-                                        setSelectionPopup(null);
-                                        setTimeout(() => fileInputRef.current?.focus(), 50);
-                                    }}
-                                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white rounded-full text-xs font-bold shadow-sm hover:bg-blue-500 transition-all whitespace-nowrap"
-                                >
-                                    <Sparkles size={12} />
-                                    Ask AI
-                                </button>
-                                <div className="w-[1px] bg-gray-200 dark:bg-white/10 my-1" />
-                                <button
-                                    onMouseDown={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        handleCopy(selectionPopup.text);
-                                        setSelectionPopup(null);
-                                    }}
-                                    className="flex items-center gap-2 px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-white/10 text-gray-700 dark:text-gray-200 rounded-full text-xs font-bold transition-all whitespace-nowrap"
-                                >
-                                    <Copy size={12} />
-                                    Copy
-                                </button>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                </div>
-
-                <footer className="p-8 relative z-20">
-                    <div className="max-w-6xl mx-auto space-y-4">
-                        <AnimatePresence>
-                            {replyingTo && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: 10 }}
-                                    className="flex items-center gap-3 p-3 glass-dark bg-white/50 dark:bg-black/40 border border-blue-500/20 rounded-2xl mb-2 backdrop-blur-md relative overflow-hidden"
-                                >
-                                    <div className="w-1 h-8 bg-blue-500 rounded-full" />
-                                    <div className="flex-1 overflow-hidden">
-                                        <p className="text-[10px] font-black uppercase text-blue-500 tracking-widest mb-0.5">Replying to {replyingTo.role === 'user' ? 'Yourself' : 'Neural Synthesizer'}</p>
-                                        <p className="text-xs text-gray-600 dark:text-gray-300 truncate font-medium">{replyingTo.content}</p>
-                                    </div>
-                                    <button
-                                        onClick={() => setReplyingTo(null)}
-                                        className="p-1.5 hover:bg-red-500/10 text-gray-400 hover:text-red-500 rounded-lg transition-colors"
-                                    >
-                                        <X size={14} />
-                                    </button>
-                                </motion.div>
-                            )}
-                            {selectedFile && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 20, scale: 0.9 }}
-                                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                                    exit={{ opacity: 0, y: 20, scale: 0.9 }}
-                                    className="relative inline-block group"
-                                >
-                                    {previewUrl ? (
-                                        <img src={previewUrl} alt="Preview" className="h-32 rounded-2xl border-2 border-blue-500 shadow-2xl" />
-                                    ) : (
-                                        <div className="h-20 px-6 bg-blue-900/20 rounded-2xl border border-blue-500/50 flex items-center gap-3 shadow-2xl backdrop-blur-md">
-                                            <FileText size={24} className="text-blue-400" />
-                                            <div className="flex flex-col">
-                                                <span className="text-sm font-bold text-blue-100 max-w-[150px] truncate">{selectedFile.name}</span>
-                                                <span className="text-[10px] text-blue-400/70 font-mono">{(selectedFile.size / 1024).toFixed(1)} KB</span>
-                                            </div>
-                                        </div>
-                                    )}
-                                    <button onClick={removeFile} className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full shadow-xl transition-colors">
-                                        <X size={12} />
-                                    </button>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-
-                        <div className="relative group">
-                            <div className="absolute inset-0 bg-blue-500/5 blur-3xl rounded-3xl opacity-0 group-focus-within:opacity-100 transition-opacity pointer-events-none" />
-                            <div className="relative glass-dark border border-gray-200 dark:border-white/10 rounded-3xl p-3 flex items-center gap-3 shadow-2xl transition-all duration-500 focus-within:border-blue-500/40 bg-white dark:bg-black/40">
-                                <button
-                                    onClick={() => fileInputRef.current?.click()}
-                                    className="w-12 h-12 flex items-center justify-center glass hover:bg-gray-100 dark:hover:bg-white/5 rounded-2xl text-gray-400 dark:text-gray-500 hover:text-blue-500 dark:hover:text-blue-400 transition-all flex-shrink-0"
-                                >
-                                    <Paperclip size={20} />
-                                </button>
-                                <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileSelect} />
-                                <textarea
-                                    rows={1}
-                                    className="flex-1 bg-transparent border-none focus:outline-none text-gray-900 dark:text-white placeholder-gray-600 dark:placeholder-gray-600 font-bold py-3 text-sm px-2 resize-none overflow-hidden leading-relaxed"
-                                    placeholder="Execute academic query..."
-                                    value={input}
-                                    onChange={(e) => {
-                                        setInput(e.target.value);
-                                        // Auto-resize
-                                        e.target.style.height = "auto";
-                                        e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
-                                    }}
-                                    onKeyDown={(e) => {
-                                        if (e.key === "Enter" && !e.shiftKey && !isLoading) {
-                                            e.preventDefault();
-                                            sendMessage();
-                                            // Reset height after send
-                                            (e.target as HTMLTextAreaElement).style.height = "auto";
-                                        }
-                                    }}
-                                    onPaste={handlePaste}
-                                />
-                                <button
-                                    onClick={() => sendMessage()}
-                                    disabled={isLoading || (!input.trim() && !selectedFile)}
-                                    className="w-12 h-12 flex items-center justify-center bg-blue-600 text-white rounded-2xl hover:bg-blue-500 hover:scale-105 active:scale-95 transition-all disabled:opacity-20 flex-shrink-0 shadow-lg shadow-blue-600/20"
-                                >
-                                    {isLoading ? <RefreshCw size={20} className="animate-spin" /> : <ChevronRight size={24} />}
-                                </button>
+                <div className={clsx("flex flex-col relative h-full", viewerMaterial ? "w-[40%]" : "flex-1")}>
+                    <header className="px-8 py-5 border-b border-white/5 flex justify-between items-center bg-white/50 dark:bg-black/20 backdrop-blur-xl">
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-blue-600/10 rounded-xl flex items-center justify-center border border-blue-500/20">
+                                <Cpu size={20} className="text-blue-500" />
+                            </div>
+                            <div>
+                                <h2 className="text-sm font-black tracking-tight">{threads.find(t => t.id === activeThreadId)?.title || "Neural Workspace"}</h2>
+                                <p className="text-[9px] font-black uppercase tracking-widest text-gray-500">Academic Synthesis Active</p>
                             </div>
                         </div>
+                    </header>
+
+                    <div className="flex-1 overflow-y-auto p-8 space-y-8 scrollbar-premium" onScroll={(e) => {
+                        const target = e.currentTarget;
+                        setIsAutoScrolling(target.scrollHeight - target.scrollTop <= target.clientHeight + 100);
+                    }}>
+                        {messages.length === 0 ? (
+                            <div className="h-full flex flex-col items-center justify-center text-center space-y-6 opacity-30">
+                                <Zap size={64} className="text-blue-500" />
+                                <h3 className="text-xl font-black">Neural Link Established</h3>
+                            </div>
+                        ) : (
+                            messages.map((msg, i) => (
+                                <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={clsx("flex", msg.role === "user" ? "justify-end" : "justify-start")}>
+                                    <div className={clsx("max-w-4xl p-6 rounded-[2rem] text-sm", msg.role === "user" ? "bg-blue-600 text-white rounded-tr-none" : "glass-dark border border-white/5 text-gray-100 rounded-tl-none shadow-2xl")}>
+                                        <MessageContent content={msg.content} sources={msg.sources} reasoning={msg.reasoning} />
+                                    </div>
+                                </motion.div>
+                            ))
+                        )}
+                        {thinkingStep && (
+                            <div className="flex items-center gap-2 text-blue-500 px-2 font-black uppercase tracking-[0.2em] text-[10px]">
+                                <Loader2 size={12} className="animate-spin" />
+                                {thinkingStep}
+                            </div>
+                        )}
+                        <div ref={messagesEndRef} />
                     </div>
-                </footer>
-            </main >
-        </div >
+
+                    <footer className="p-8">
+                        <div className="max-w-4xl mx-auto relative group">
+                            <div className="glass-dark border border-white/10 rounded-3xl p-3 flex items-center gap-3 bg-white/50 dark:bg-black/40">
+                                <button onClick={() => fileInputRef.current?.click()} className="w-12 h-12 flex items-center justify-center rounded-2xl hover:bg-white/5 text-gray-400 transition-all"><Paperclip size={20} /></button>
+                                <input type="file" ref={fileInputRef} className="hidden" onChange={(e) => setSelectedFile(e.target.files?.[0] || null)} />
+                                <textarea
+                                    rows={1}
+                                    value={input}
+                                    onChange={(e) => setInput(e.target.value)}
+                                    onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
+                                    className="flex-1 bg-transparent border-none focus:outline-none text-white font-bold py-3 text-sm px-2 resize-none"
+                                    placeholder="Execute neural query..."
+                                />
+                                <button onClick={() => sendMessage()} disabled={isLoading} className="w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center shadow-lg"><ChevronRight size={24} /></button>
+                            </div>
+                        </div>
+                    </footer>
+                </div>
+            </main>
+        </div>
     );
 }
 
 export default function ChatPage() {
     return (
-        <Suspense fallback={<div className="flex-1 flex items-center justify-center text-blue-500 font-bold tracking-widest animate-pulse uppercase bg-[#050505]">Initializing Neural Link...</div>}>
+        <Suspense fallback={<div className="h-screen bg-[#050505] flex items-center justify-center text-blue-500 font-bold">INIT...</div>}>
             <ChatBody />
         </Suspense>
     );
