@@ -9,7 +9,7 @@ import {
     Cloud, RefreshCw, ChevronRight, GraduationCap,
     ExternalLink, MapPin, User as UserIcon, CheckCircle2,
     Zap, Users, Mail, MessageSquare, Settings as SettingsIcon,
-    Moon, Sun, Command, FileText
+    Moon, Sun, Command, FileText, Network
 } from "lucide-react";
 import clsx from "clsx";
 import { useRouter } from "next/navigation";
@@ -391,10 +391,10 @@ export default function Dashboard() {
                                     .map((course) => (
                                         <div
                                             key={course.id}
-                                            onClick={() => window.location.href = `/course/${course.id}`}
                                             className="group p-5 bg-gray-50/50 dark:bg-white/2 border border-transparent hover:border-blue-500/20 hover:bg-white dark:hover:bg-white/5 rounded-[1.5rem] flex items-center gap-5 transition-all cursor-pointer"
+                                            onClick={() => window.location.href = `/course/${course.id}`}
                                         >
-                                            <div className="w-10 h-10 rounded-xl bg-blue-600/10 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm">
+                                            <div className="w-10 h-10 rounded-xl bg-blue-600/10 flex items-center justify-center text-blue-600 group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm flex-shrink-0">
                                                 <BookOpen size={18} />
                                             </div>
                                             <div className="flex-1 min-w-0">
@@ -410,7 +410,15 @@ export default function Dashboard() {
                                                     </div>
                                                 )}
                                             </div>
-                                            <ChevronRight size={14} className="text-gray-300 group-hover:text-blue-500 transition-all translate-x-0 group-hover:translate-x-1" />
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); router.push(`/mindmap/${course.id}`); }}
+                                                className="opacity-0 group-hover:opacity-100 flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600/10 hover:bg-indigo-600/20 border border-indigo-500/20 rounded-lg text-[10px] font-black text-indigo-400 transition-all uppercase tracking-wider flex-shrink-0"
+                                                title="Generate Mind Map"
+                                            >
+                                                <Network size={12} />
+                                                Map
+                                            </button>
+                                            <ChevronRight size={14} className="text-gray-300 group-hover:text-blue-500 transition-all translate-x-0 group-hover:translate-x-1 flex-shrink-0" />
                                         </div>
                                     ))
                             ) : (courses.length === 0 && !loading) ? (

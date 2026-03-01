@@ -3,7 +3,7 @@ import Sidebar from "@/components/Sidebar";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useParams, useRouter } from "next/navigation";
-import { Book, Clock, ChevronRight, FileText, Youtube, Link as LinkIcon, CheckCircle2, Search, ArrowLeft, User, X, Calendar, Layers, ExternalLink, File, FileSpreadsheet, Image, Download, Eye, FileCode, Paperclip, Sparkles } from "lucide-react";
+import { Book, Clock, ChevronRight, FileText, Youtube, Link as LinkIcon, CheckCircle2, Search, ArrowLeft, User, X, Calendar, Layers, ExternalLink, File, FileSpreadsheet, Image, Download, Eye, FileCode, Paperclip, Sparkles, Network } from "lucide-react";
 import clsx from "clsx";
 import Link from "next/link";
 import { API_URL } from "@/utils/config";
@@ -178,15 +178,25 @@ export default function CoursePage() {
                             </div>
                         </div>
 
-                        <div className="relative w-80 group">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-500 transition-colors" size={18} />
-                            <input
-                                type="text"
-                                placeholder="Search course materials..."
-                                className="w-full pl-12 pr-4 py-3.5 glass-dark border border-white/10 rounded-2xl focus:outline-none focus:border-blue-500/50 transition-all font-medium placeholder:text-gray-600"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                            />
+                        <div className="flex items-center gap-3">
+                            {/* Mind Map Button */}
+                            <button
+                                onClick={() => router.push(`/mindmap/${course?.id}`)}
+                                className="flex items-center gap-2 px-5 py-3.5 bg-indigo-600/10 hover:bg-indigo-600/20 border border-indigo-500/30 hover:border-indigo-500/50 rounded-2xl text-sm font-black text-indigo-300 transition-all cursor-pointer group"
+                            >
+                                <Network size={16} className="text-indigo-400 group-hover:scale-110 transition-transform" />
+                                Mind Map
+                            </button>
+                            <div className="relative w-72 group">
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-blue-500 transition-colors" size={18} />
+                                <input
+                                    type="text"
+                                    placeholder="Search course materials..."
+                                    className="w-full pl-12 pr-4 py-3.5 glass-dark border border-white/10 rounded-2xl focus:outline-none focus:border-blue-500/50 transition-all font-medium placeholder:text-gray-600"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                />
+                            </div>
                         </div>
                     </div>
 

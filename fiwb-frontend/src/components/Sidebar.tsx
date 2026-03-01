@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, MessageSquareText, Settings, LogOut, ChevronRight, Plus, MessageCircle, Trash2, TrendingUp, Mail, Cloud, BookOpen } from "lucide-react";
+import { LayoutDashboard, MessageSquareText, Settings, LogOut, ChevronRight, Plus, MessageCircle, Trash2, TrendingUp, Mail, Cloud, BookOpen, Network } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import DriveSyncModal from "@/components/DriveSyncModal";
 import clsx from "clsx";
@@ -38,6 +38,7 @@ export default function Sidebar({ threads = [], activeThreadId, onThreadSelect, 
     const links = [
         { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
         { name: "AI Chatbot", href: "/chat", icon: MessageSquareText },
+        { name: "Mind Maps", href: "/dashboard", icon: Network },
         { name: "Operational Insights", href: "/admin", icon: TrendingUp },
         { name: "Settings", href: "/settings", icon: Settings },
     ];

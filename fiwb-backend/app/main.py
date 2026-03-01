@@ -58,12 +58,12 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 # Routers
-from app.api import chat, courses, auth, notifications, drive, moodle, admin, search
+from app.api import chat, courses, auth, notifications, drive, moodle, admin, search, mindmap
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(chat.router, prefix="/api/chat", tags=["chat"])
 app.include_router(courses.router, prefix="/api/courses", tags=["courses"])
-
+app.include_router(mindmap.router, prefix="/api/mindmap", tags=["mindmap"])
 app.include_router(drive.router, prefix="/api/drive", tags=["drive"])
 app.include_router(moodle.router, prefix="/api/moodle", tags=["moodle"])
 app.include_router(notifications.router, prefix="/api/notifications", tags=["notifications"])
