@@ -390,7 +390,9 @@ function AnalysisBody() {
 
         const fetchMaterial = async () => {
             try {
-                const res = await fetch(`${API_URL}/api/courses/material/${material_id}?user_email=${userEmail}`);
+                // Use query-param endpoint so Drive URLs are not mangled in the path
+                const params = new URLSearchParams({ material_id: material_id as string, user_email: userEmail! });
+                const res = await fetch(`${API_URL}/api/courses/material?${params.toString()}`);
                 const data = await res.json();
                 if (data.error) throw new Error(data.error);
 
@@ -539,8 +541,9 @@ function AnalysisBody() {
             formData.append("query_type", "notebook_analysis");
             if (material?.course_id) formData.append("course_id", material.course_id);
 
-            // PRIORITY: Focus grounding on the document the student is currently viewing
-            const focusId = activeAttachment?.id || material?.id;
+            // PRIORITY: Focus grounding on the document the student is currently viewing.
+            // Use the Drive URL when available (same as 'View Original') for reliable resolution.
+            const focusId = activeAttachment?.url || activeAttachment?.id || material?.source_link || material?.id;
             if (focusId) formData.append("material_id", focusId);
 
             // Pass document content for grounding

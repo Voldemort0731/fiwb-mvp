@@ -159,84 +159,105 @@ def get_course_materials(course_id: str, user_email: str, db: Session = Depends(
 
     return results
 
-@router.get("/material/{material_id}")
-def get_material(material_id: str, user_email: str, db: Session = Depends(get_db)):
-    """Fetch details for a specific classwork material/assignment."""
-    email = standardize_email(user_email)
-    user = db.query(User).filter(User.email == email).first()
-    if not user:
-        return {"error": "User not found"}
+def _resolve_material(material_id: str, user_id: int, db: Session):
+    """Shared resolution logic: find a Material record from any ID format (DB id, Drive URL, Drive file ID)."""
+    import re
 
-    # SELF-HEALING ID RESOLUTION (Resolve direct IDs, prefixed IDs, or URLs)
+    # 1. Direct DB match
     m = db.query(Material).filter(
         Material.id == material_id,
-        or_(Material.user_id == user.id, Material.user_id == None)
+        or_(Material.user_id == user_id, Material.user_id == None)
     ).first()
+    if m:
+        return m
 
-    if not m:
-        # 1. Try to extract Google Drive ID if material_id looks like a URL or ID
-        import re
-        drive_id_match = re.search(r'([a-zA-Z0-9_-]{25,})', material_id)
-        if drive_id_match:
-            did = drive_id_match.group(1)
-            # Try finding by ID directly, with prefixes, or inside source link
-            # PRIORITY: Prefer materials that are actually drive files or attachments
-            m = db.query(Material).filter(
-                or_(
-                    Material.id == did,
-                    Material.id.like(f"%{did}%"),
-                    Material.source_link.like(f"%{did}%")
-                ),
-                or_(Material.user_id == user.id, Material.user_id == None)
-            ).order_by(
-                case(
-                    (Material.type.in_(["drive_file", "attachment"]), 0),
-                    else_=1
-                )
-            ).first()
-    
-    if not m:
-        # 2. General fallback for non-drive IDs
+    # 2. Extract longest alphanumeric token (Drive File ID pattern: 25+ chars)
+    drive_id_match = re.search(r'([a-zA-Z0-9_-]{25,})', material_id)
+    if drive_id_match:
+        did = drive_id_match.group(1)
         m = db.query(Material).filter(
-            Material.source_link.like(f"%{material_id}%"),
-            or_(Material.user_id == user.id, Material.user_id == None)
+            or_(
+                Material.id == did,
+                Material.id.like(f"%{did}%"),
+                Material.source_link.like(f"%{did}%")
+            ),
+            or_(Material.user_id == user_id, Material.user_id == None)
+        ).order_by(
+            case(
+                (Material.type.in_(["drive_file", "attachment"]), 0),
+                else_=1
+            )
         ).first()
+        if m:
+            return m
 
-    if not m:
-        raise HTTPException(status_code=404, detail="Material not found in your academic vault. Please ensure the course is synced.")
+    # 3. Source link fuzzy fallback
+    m = db.query(Material).filter(
+        Material.source_link.like(f"%{material_id}%"),
+        or_(Material.user_id == user_id, Material.user_id == None)
+    ).first()
+    return m
 
+
+def _build_material_response(m: Material) -> dict:
+    """Build the standard material response dict from a Material ORM object."""
     try:
         raw_atts = json.loads(m.attachments) if m.attachments else []
-        # Normalize: ensure id exists even if it's file_id
         atts = []
         for a in raw_atts:
-            # Google Classroom structure check: unwraps nested driveFile or link objects
             df = a.get("driveFile", {}).get("driveFile", {}) if "driveFile" in a else a
-            
-            fid = df.get("id") or df.get("file_id") or a.get("id")
+            fid   = df.get("id") or df.get("file_id") or a.get("id")
             title = df.get("title") or a.get("title") or "Attachment"
-            url = df.get("alternateLink") or a.get("url") or a.get("alternateLink")
-            mime = df.get("mimeType") or a.get("mime_type") or ""
-            
+            url   = df.get("alternateLink") or a.get("url") or a.get("alternateLink")
+            mime  = df.get("mimeType") or a.get("mime_type") or ""
             atts.append({
-                "id": fid,
-                "title": title,
-                "url": url,
-                "type": a.get("type", "drive_file"),
+                "id":        fid,
+                "title":     title,
+                "url":       url,
+                "type":      a.get("type", "drive_file"),
                 "file_type": "pdf" if "pdf" in mime.lower() or title.lower().endswith(".pdf") else "document"
             })
     except:
         atts = []
 
     return {
-        "id": m.id,
-        "title": m.title,
-        "type": m.type,
-        "content": m.content or m.title,
+        "id":          m.id,
+        "title":       m.title,
+        "type":        m.type,
+        "content":     m.content or m.title,
         "attachments": atts,
-        "course_id": m.course_id,
+        "course_id":   m.course_id,
         "source_link": m.source_link
     }
+
+
+@router.get("/material")
+def get_material_by_query(material_id: str, user_email: str, db: Session = Depends(get_db)):
+    """Fetch material by material_id passed as a QUERY PARAM (safe for Drive URLs)."""
+    email = standardize_email(user_email)
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        return {"error": "User not found"}
+
+    m = _resolve_material(material_id, user.id, db)
+    if not m:
+        raise HTTPException(status_code=404, detail="Material not found. Please ensure the course is synced.")
+    return _build_material_response(m)
+
+
+@router.get("/material/{material_id}")
+def get_material(material_id: str, user_email: str, db: Session = Depends(get_db)):
+    """Fetch details for a specific classwork material/assignment (path-param version)."""
+    email = standardize_email(user_email)
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        return {"error": "User not found"}
+
+    m = _resolve_material(material_id, user.id, db)
+    if not m:
+        raise HTTPException(status_code=404, detail="Material not found in your academic vault. Please ensure the course is synced.")
+    return _build_material_response(m)
+
 
 @router.get("/proxy/drive/{file_id}")
 async def proxy_drive_file(file_id: str, user_email: str, db: Session = Depends(get_db)):
