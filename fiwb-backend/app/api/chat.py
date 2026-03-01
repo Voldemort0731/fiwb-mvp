@@ -312,12 +312,9 @@ async def chat_stream(
                         base_title = meta.get('title') or meta.get('file_name') or meta.get('file_title') or "Institutional Document"
                         full_title = f"{base_title} [{course_name}]" if course_name else base_title
 
-                        # RESOLVE MATERIAL ID: prefer Drive source_link, fallback to source_id/id
+                        # RESOLVE MATERIAL ID: Exactly matching Dashboard functionality (use DB source_id)
+                        mat_id = meta.get("source_id") or meta.get("id")
                         sl = meta.get("source_link") or meta.get("url") or meta.get("webViewLink")
-                        if sl and "drive.google.com" in sl:
-                            mat_id = sl
-                        else:
-                            mat_id = meta.get("source_id") or meta.get("id")
 
 
                         if meta.get("type") == "announcement":
@@ -328,9 +325,8 @@ async def chat_stream(
                                 for other in c_data.get("course_context", []):
                                     om = other.get("metadata", {})
                                     if om.get("source_id") == ann_id or om.get("parent_announcement_id") == ann_id:
-                                        child_sl = om.get("source_link") or om.get("url")
-                                        mat_id = child_sl if child_sl and "drive.google.com" in child_sl else om.get("source_id") or om.get("id")
-                                        sl = child_sl or sl
+                                        mat_id = om.get("source_id") or om.get("id")
+                                        sl = om.get("source_link") or om.get("url") or sl
                                         found_att = True
                                         break
                                 
@@ -342,9 +338,8 @@ async def chat_stream(
                                                 atts = json.loads(m_record.attachments)
                                                 if atts:
                                                     first_att = atts[0]
-                                                    att_url = first_att.get("url") or first_att.get("alternateLink")
-                                                    mat_id = att_url or first_att.get("id") or first_att.get("file_id")
-                                                    sl = att_url or sl
+                                                    mat_id = first_att.get("id") or first_att.get("file_id") or ann_id
+                                                    sl = first_att.get("url") or first_att.get("alternateLink") or sl
                                                     found_att = True
                                             except: pass
                                         if not found_att:
@@ -353,7 +348,7 @@ async def chat_stream(
                                                 Material.type.in_(["drive_file", "attachment"])
                                             ).first()
                                             if child_att:
-                                                mat_id = child_att.source_link or child_att.id
+                                                mat_id = child_att.id
                                                 sl     = child_att.source_link or sl
                                     except: pass
 

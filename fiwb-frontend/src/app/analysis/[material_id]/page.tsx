@@ -237,8 +237,8 @@ function MessageContent({ content, onCitationClick, onQuestionClick, sources, on
                     <div className="grid grid-cols-1 gap-3">
                         {sources.map((source, idx) => {
                             const displayTitle = source.display || source.title;
-                            // Stable ID for analysis: Prefer the Drive link if it exists, as the backend resolved it
-                            const analyzerId = source.material_id || source.link;
+                            // Stable ID for analysis: EXACTLY match how the dashboard works (use DB string ID)
+                            const analyzerId = source.material_id;
 
                             return (
                                 <motion.div
