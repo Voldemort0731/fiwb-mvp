@@ -214,6 +214,7 @@ function MindMapBody() {
     const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
     const [activeMaterialId, setActiveMaterialId] = useState<string | null>(null);
+    const [activePage, setActivePage] = useState<number | null>(null);
     const [showReader, setShowReader] = useState(false);
 
     const userEmail = typeof window !== "undefined" ? localStorage.getItem("user_email") : null;
@@ -370,6 +371,7 @@ function MindMapBody() {
             const firstCite = nd.citations[0];
             if (firstCite.material_id) {
                 setActiveMaterialId(firstCite.material_id);
+                setActivePage(firstCite.page || null);
                 setShowReader(true);
             }
         }
@@ -534,8 +536,9 @@ function MindMapBody() {
                                 {activeMaterialId ? (
                                     <div className="flex-1 relative">
                                         <iframe
+                                            key={`${activeMaterialId}-${activePage}`}
                                             ref={iframeRef}
-                                            src={`${API_URL}/api/courses/proxy/drive/${activeMaterialId}?user_email=${userEmail}`}
+                                            src={`${API_URL}/api/courses/proxy/drive/${activeMaterialId}?user_email=${userEmail}${activePage ? `#page=${activePage}` : ""}`}
                                             className="w-full h-full border-none bg-white"
                                             title="Document Reader"
                                         />
@@ -840,6 +843,7 @@ function MindMapBody() {
                                                     onClick={() => {
                                                         if (cite.material_id) {
                                                             setActiveMaterialId(cite.material_id);
+                                                            setActivePage(cite.page || null);
                                                             setShowReader(true);
                                                         }
                                                     }}
