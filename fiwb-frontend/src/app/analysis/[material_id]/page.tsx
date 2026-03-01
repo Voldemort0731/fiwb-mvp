@@ -799,20 +799,41 @@ function AnalysisBody() {
                         )}
 
                         <div className="flex-1 relative bg-white overflow-hidden">
-                            {activeAttachment ? (
-                                <iframe
-                                    key={`${activeAttachment.id}-${userEmail}`}
-                                    ref={iframeRef}
-                                    src={
-                                        activeAttachment.url?.includes('drive.google.com')
-                                            ? `${API_URL}/api/courses/proxy/drive/${activeAttachment.id}?user_email=${userEmail}`
-                                            : activeAttachment.url?.replace('/view', '/preview')
-                                    }
-                                    className="w-full h-full border-none"
-                                    title="Document Preview"
-                                    allow="autoplay"
-                                />
-                            ) : (
+                            {activeAttachment ? (() => {
+                                const url = activeAttachment.url || "";
+
+                                // Build the embed URL depending on the Google service
+                                let embedUrl = "";
+                                if (url.includes("docs.google.com/document")) {
+                                    // Google Docs -> /preview
+                                    embedUrl = url.replace(/\/edit.*$/, "/preview").replace(/\/view.*$/, "/preview");
+                                } else if (url.includes("docs.google.com/presentation")) {
+                                    // Google Slides -> /embed
+                                    embedUrl = url.replace(/\/edit.*$/, "/embed").replace(/\/view.*$/, "/embed").replace(/\/pub.*$/, "/embed");
+                                } else if (url.includes("docs.google.com/spreadsheets")) {
+                                    // Google Sheets -> /preview (htmlview)
+                                    embedUrl = url.replace(/\/edit.*$/, "/preview").replace(/\/view.*$/, "/preview");
+                                } else if (url.includes("drive.google.com")) {
+                                    // Raw Drive file -> use backend proxy
+                                    embedUrl = activeAttachment.id
+                                        ? `${API_URL}/api/courses/proxy/drive/${activeAttachment.id}?user_email=${userEmail}`
+                                        : url.replace("/view", "/preview");
+                                } else if (url) {
+                                    // Any other URL -> try direct
+                                    embedUrl = url;
+                                }
+
+                                return (
+                                    <iframe
+                                        key={`${activeAttachment.id || activeAttachment.url}-${userEmail}`}
+                                        ref={iframeRef}
+                                        src={embedUrl}
+                                        className="w-full h-full border-none"
+                                        title="Document Preview"
+                                        allow="autoplay"
+                                    />
+                                );
+                            })() : (
                                 <div className="w-full h-full flex flex-col items-center justify-center bg-[#0a0a0a] p-10 text-center">
                                     <div className="w-20 h-20 rounded-3xl bg-white/5 flex items-center justify-center mb-6 border border-white/10">
                                         <FileText size={40} className="text-gray-600" />
@@ -826,7 +847,7 @@ function AnalysisBody() {
                             )}
 
                             {/* Viewer Controls Overlay */}
-                            {activeAttachment?.url?.includes('drive.google.com') && (
+                            {activeAttachment?.url && (activeAttachment.url.includes('drive.google.com') || activeAttachment.url.includes('docs.google.com')) && (
                                 <div className="absolute top-4 right-4 flex items-center gap-2">
                                     <button
                                         onClick={() => {
