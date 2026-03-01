@@ -174,15 +174,23 @@ def get_material(material_id: str, user_email: str, db: Session = Depends(get_db
     ).first()
 
     if not m:
-        # 1. Check for prefixed variants
-        prefixed = [f"ann_att_{material_id}", f"drive_file_{material_id}", f"ann_{material_id}"]
-        m = db.query(Material).filter(
-            Material.id.in_(prefixed),
-            or_(Material.user_id == user.id, Material.user_id == None)
-        ).first()
+        # 1. Try to extract Google Drive ID if material_id looks like a URL or ID
+        import re
+        drive_id_match = re.search(r'([a-zA-Z0-9_-]{25,})', material_id)
+        if drive_id_match:
+            did = drive_id_match.group(1)
+            # Try finding by ID directly, with prefixes, or inside source link
+            m = db.query(Material).filter(
+                or_(
+                    Material.id == did,
+                    Material.id.like(f"%{did}%"),
+                    Material.source_link.like(f"%{did}%")
+                ),
+                or_(Material.user_id == user.id, Material.user_id == None)
+            ).first()
     
     if not m:
-        # 2. Check source_link if the ID is just a raw Google Drive ID or URL
+        # 2. General fallback for non-drive IDs
         m = db.query(Material).filter(
             Material.source_link.like(f"%{material_id}%"),
             or_(Material.user_id == user.id, Material.user_id == None)

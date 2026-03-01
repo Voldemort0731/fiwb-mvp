@@ -203,11 +203,21 @@ async def chat_stream(
                 # 1. Main Material (Self-healing lookup)
                 m = db.query(Material).filter(Material.id == material_id).first()
                 if not m:
-                    # Try prefixed variants (announcement attachments, drive files)
-                    prefixed = [f"ann_att_{material_id}", f"drive_file_{material_id}", f"ann_{material_id}"]
-                    m = db.query(Material).filter(Material.id.in_(prefixed)).first()
+                    # Try Drive ID extraction for fuzzy match (robust)
+                    import re
+                    did_match = re.search(r'([a-zA-Z0-9_-]{25,})', material_id)
+                    if did_match:
+                        did = did_match.group(1)
+                        m = db.query(Material).filter(
+                            or_(
+                                Material.id == did,
+                                Material.id.like(f"%{did}%"),
+                                Material.source_link.like(f"%{did}%")
+                            )
+                        ).first()
+                
                 if not m:
-                    # Final fallback: Look for ID inside source links
+                    # Final fallback: Broad source_link search
                     m = db.query(Material).filter(Material.source_link.like(f"%{material_id}%")).first()
 
                 if m:
@@ -301,6 +311,11 @@ async def chat_stream(
                                             if child_att:
                                                 mat_id = child_att.id
                                     except: pass
+                        
+                        # PRIORITY: If we have a Drive source link, use it for material_id (Analyzer stability)
+                        sl = meta.get("source_link") or meta.get("url") or meta.get("webViewLink")
+                        if sl and "drive.google.com" in sl:
+                            mat_id = sl
 
                         if full_title not in sources_dict:
                             sources_dict[full_title] = {
