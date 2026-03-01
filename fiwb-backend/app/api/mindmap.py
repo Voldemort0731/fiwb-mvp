@@ -116,43 +116,49 @@ async def generate_mindmap(
     total_chars = 0
     MAX_CHARS = 40000
 
-    for m in materials:
-        if total_chars >= MAX_CHARS:
-            break
-        
+    async def process_material(m):
         material_text = f"[MATERIAL: {m.title}]\n"
         if m.content:
-            material_text += m.content[:5000] # Use more text if available
+            material_text += m.content[:5000]
         else:
             material_text += "(No text content)"
 
-        # ── EXTRACT CONTENT FROM ATTACHMENTS ───────────────────────
         if m.attachments and m.attachments != "[]":
             try:
                 attachments = json.loads(m.attachments)
-                # Limit to 3 attachments per material to avoid timeouts
+                # Limit to 3 attachments per material
+                tasks = []
                 for att in attachments[:3]:
-                    # Handle both Classroom driveFile and standard Drive format
                     file_id = att.get("file_id") or att.get("id")
                     mime_type = att.get("mime_type") or att.get("mimeType")
-                    
                     if file_id and (att.get("type") in ["drive", "drive_file"] or "google-apps" in str(mime_type) or "pdf" in str(mime_type)):
-                        logger.info(f"[MindMap] Fetching content for attachment: {att.get('title')}")
-                        doc_content = await drive_service._get_file_content({"id": file_id, "mimeType": mime_type or ""})
-                        if doc_content:
-                            material_text += f"\n--- [ATTACHMENT: {att.get('title')}] ---\n"
-                            material_text += doc_content[:5000] # Cap text from attachment
+                        tasks.append((att.get("title"), drive_service._get_file_content({"id": file_id, "mimeType": mime_type or ""})))
+                
+                if tasks:
+                    results = await asyncio.gather(*(t[1] for t in tasks), return_exceptions=True)
+                    for i, doc_content in enumerate(results):
+                        if isinstance(doc_content, str) and doc_content:
+                            title = tasks[i][0]
+                            material_text += f"\n--- [ATTACHMENT: {title}] ---\n"
+                            material_text += doc_content[:5000]
             except Exception as e:
-                logger.warning(f"[MindMap] Failed to extract attachment content for {m.id}: {e}")
-
+                logger.warning(f"[MindMap] Failed to extract attachments for {m.id}: {e}")
+        
         material_text += "\n---\n"
-        content_blocks.append(material_text)
-        source_list.append({
-            "id": m.id,
-            "title": m.title,
-            "type": m.type
-        })
-        total_chars += len(material_text)
+        return material_text
+
+    # Extract all material content in parallel (limited to first 10 materials to avoid blowing up)
+    extraction_tasks = [process_material(m) for m in materials[:10]]
+    content_blocks = await asyncio.gather(*extraction_tasks)
+    
+    for i, block in enumerate(content_blocks):
+        total_chars += len(block)
+        if total_chars > MAX_CHARS:
+            content_blocks = content_blocks[:i]
+            break
+
+    # Build source list correctly
+    source_list = [{"id": m.id, "title": m.title, "type": m.type} for m in materials[:len(content_blocks)]]
 
     combined_content = "\n".join(content_blocks)
     prompt = MINDMAP_PROMPT.format(content=combined_content)

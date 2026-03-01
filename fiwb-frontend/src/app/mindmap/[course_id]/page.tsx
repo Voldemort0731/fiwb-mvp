@@ -301,11 +301,12 @@ function MindMapBody() {
             setGraphData(data);
             buildFlowGraph(data);
         } catch (e: any) {
+            console.error("Mind map generation failed:", e);
             const msg = e.message || "";
-            if (msg === "Failed to fetch" || msg.includes("NetworkError") || msg.includes("fetch")) {
-                setError("Backend is starting up — please wait 10 seconds and try again.");
+            if (msg === "Failed to fetch") {
+                setError("Neural link interrupted. This usually means the backend is restarting or your connection dropped. Please wait 10s and retry.");
             } else {
-                setError(msg || "Failed to generate mind map");
+                setError(msg || "Failed to generate mind map. Please check your document selection.");
             }
         } finally {
             setGenerating(false);
