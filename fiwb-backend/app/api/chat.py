@@ -162,7 +162,9 @@ async def chat_stream(
     db.add(user_msg_db)
     thread.updated_at = datetime.utcnow()
     db.commit()
-    # db.close() REMOVED: generate() needs it below 
+    
+    # Release core DB session before long-running streaming
+    db.close() 
 
     # 3. Intelligence Multi-tasking
     async def generate():
@@ -176,13 +178,8 @@ async def chat_stream(
             # Classification and Retrieval (Async Parallel)
             short_term_history = []
             if history:
-                if isinstance(history, str):
-                    try: short_term_history = json.loads(history)
-                    except: 
-                        logger.warning(f"[Chat] Failed to parse history string: {history[:100]}")
-                        short_term_history = []
-                elif isinstance(history, (list, tuple)):
-                    short_term_history = list(history)
+                try: short_term_history = json.loads(history)
+                except: pass
 
             # 1. Classification first to decide if we need retrieval
             yield f"data: EVENT:THINKING:Classifying intent...\n\n"
@@ -205,27 +202,10 @@ async def chat_stream(
                 logger.info(f"[Chat] Focused retrieval active for material: {material_id}")
             # ENFORCE GROUNDING: If material_id provided, fetch its components
             if material_id:
-                # 1. Main Material (Self-healing lookup)
+                # 1. Main Material
                 m = db.query(Material).filter(Material.id == material_id).first()
-                if not m:
-                    # Try Drive ID extraction for fuzzy match (robust)
-                    import re
-                    did_match = re.search(r'([a-zA-Z0-9_-]{25,})', material_id)
-                    if did_match:
-                        did = did_match.group(1)
-                        m = db.query(Material).filter(
-                            or_(
-                                Material.id == did,
-                                Material.id.like(f"%{did}%"),
-                                Material.source_link.like(f"%{did}%")
-                            )
-                        ).first()
-                
-                if not m:
-                    # Final fallback: Broad source_link search
-                    m = db.query(Material).filter(Material.source_link.like(f"%{material_id}%")).first()
-
                 if m:
+                    # Inject into retrieved course_context
                     if m.content:
                         c_data.setdefault("course_context", []).insert(0, {
                             "content": m.content,
@@ -233,14 +213,14 @@ async def chat_stream(
                                 "title": m.title,
                                 "type": m.type,
                                 "course_id": m.course_id,
-                                "id": m.id,
-                                "source_link": m.source_link
+                                "id": m.id
                             }
                         })
                     
                     # 2. Attachments
                     try:
                         atts = json.loads(m.attachments) if m.attachments else []
+                        # Also fetch full attachment contents
                         ids_to_fetch = []
                         for a in atts:
                             fid = a.get("id") or a.get("file_id")
@@ -251,20 +231,17 @@ async def chat_stream(
                             att_materials = db.query(Material).filter(Material.id.in_(ids_to_fetch)).all()
                             for att_m in att_materials:
                                 if att_m.content:
-                                    # INJECT as primary academic document
                                     c_data.setdefault("course_context", []).insert(0, {
                                         "content": att_m.content,
                                         "metadata": {
                                             "title": att_m.title,
                                             "type": "attachment",
-                                            "course_name": m.title, # Label with announcement name for context
-                                            "source_id": m.id, # Parent reference
-                                            "id": att_m.id, # The actual doc to analyze
-                                            "source_link": att_m.source_link
+                                            "course_name": m.title,
+                                            "id": att_m.id
                                         }
                                     })
-                    except Exception as e:
-                        logger.warning(f"Failed to inject attachments for grounding: {e}")
+                    except:
+                        pass
 
             # BROADCAST SOURCES (Dynamic) - ONLY if not general chat
             sources_dict = {}
@@ -275,102 +252,23 @@ async def chat_stream(
                     for item in c_data.get(cat, []):
                         meta = item.get("metadata", {})
                         
-                        # ── DB FALLBACK: Enrich incomplete Supermemory metadata from local DB ──
-                        # The retrieval.py fix ensures doc-level metadata wins, but for old indexed
-                        # content that may be missing fields, we do a DB lookup using source_id.
-                        source_id_key = meta.get("source_id")
-                        if source_id_key and (not meta.get("title") or not meta.get("source_link")):
-                            try:
-                                import re as _re
-                                db_mat = db.query(Material).filter(Material.id == source_id_key).first()
-                                if not db_mat:
-                                    # Drive ID extraction (for ann_att_ prefixed IDs)
-                                    dm = _re.search(r'([a-zA-Z0-9_-]{25,})', source_id_key)
-                                    if dm:
-                                        did2 = dm.group(1)
-                                        from sqlalchemy import case as _case
-                                        db_mat = db.query(Material).filter(
-                                            or_(
-                                                Material.id == did2,
-                                                Material.id.like(f"%{did2}%"),
-                                                Material.source_link.like(f"%{did2}%")
-                                            )
-                                        ).order_by(
-                                            _case((Material.type.in_(["drive_file", "attachment"]), 0), else_=1)
-                                        ).first()
-                                if db_mat:
-                                    meta = {
-                                        **meta,
-                                        "title":       meta.get("title")       or db_mat.title,
-                                        "source_link": meta.get("source_link") or db_mat.source_link,
-                                        "source_id":   meta.get("source_id")   or db_mat.id,
-                                        "id":          meta.get("id")          or db_mat.id,
-                                        "course_id":   meta.get("course_id")   or db_mat.course_id,
-                                        "type":        meta.get("type")        or db_mat.type,
-                                    }
-                            except Exception as _e:
-                                logger.warning(f"[Chat] DB fallback failed: {_e}")
-                        # ─────────────────────────────────────────────────────────────────────
-
-                        # Unified Title Logic
+                        # Unified Title Logic (Matched with PromptArchitect)
                         course_name = meta.get('course_name') or meta.get('course_id') or ""
-                        base_title = meta.get('title') or meta.get('file_name') or meta.get('file_title') or "Institutional Document"
+                        base_title = meta.get('title') or meta.get('file_name') or "Institutional Document"
                         full_title = f"{base_title} [{course_name}]" if course_name else base_title
-
-                        # RESOLVE MATERIAL ID: Exactly matching Dashboard functionality (use DB source_id)
-                        mat_id = meta.get("source_id") or meta.get("id")
-                        sl = meta.get("source_link") or meta.get("url") or meta.get("webViewLink")
-
-
-                        if meta.get("type") == "announcement":
-                            found_att = False
-                            ann_id = meta.get("source_id") or meta.get("id")
-                            if ann_id:
-                                # 1. Check current context for child attachments
-                                for other in c_data.get("course_context", []):
-                                    om = other.get("metadata", {})
-                                    if om.get("source_id") == ann_id or om.get("parent_announcement_id") == ann_id:
-                                        mat_id = om.get("source_id") or om.get("id")
-                                        sl = om.get("source_link") or om.get("url") or sl
-                                        found_att = True
-                                        break
-                                
-                                if not found_att:
-                                    try:
-                                        m_record = db.query(Material).filter(Material.id == ann_id).first()
-                                        if m_record and m_record.attachments:
-                                            try:
-                                                atts = json.loads(m_record.attachments)
-                                                if atts:
-                                                    first_att = atts[0]
-                                                    mat_id = first_att.get("id") or first_att.get("file_id") or ann_id
-                                                    sl = first_att.get("url") or first_att.get("alternateLink") or sl
-                                                    found_att = True
-                                            except: pass
-                                        if not found_att:
-                                            child_att = db.query(Material).filter(
-                                                (Material.id.like(f"%{ann_id}%")) | (Material.source_link.like(f"%{ann_id}%")),
-                                                Material.type.in_(["drive_file", "attachment"])
-                                            ).first()
-                                            if child_att:
-                                                mat_id = child_att.id
-                                                sl     = child_att.source_link or sl
-                                    except: pass
-
-                        # DEDUPLICATION: Group by mat_id if available, otherwise by title
-                        dedup_key = mat_id or full_title
-                        if dedup_key not in sources_dict:
-                            sources_dict[dedup_key] = {
-                                "title":       full_title,
-                                "display":     f"{prefix}{full_title}",
-                                "link":        sl,
-                                "snippets":    [item.get("content", "")],
-                                "source_type": meta.get("type", "document"),
-                                "material_id": mat_id
+                        
+                        if full_title not in sources_dict:
+                            sources_dict[full_title] = {
+                                "title": full_title,
+                                "display": f"{prefix}{full_title}",
+                                "link": meta.get("source_link") or meta.get("url") or meta.get("webViewLink") or meta.get("link"),
+                                "snippets": [item.get("content", "")],
+                                "source_type": meta.get("type", "document")
                             }
                         else:
-                            if len(sources_dict[dedup_key]["snippets"]) < 3:
-                                sources_dict[dedup_key]["snippets"].append(item.get("content", ""))
+                            # Append more snippets (up to 3) for more complete context
+                            if len(sources_dict[full_title]["snippets"]) < 3:
+                                sources_dict[full_title]["snippets"].append(item.get("content", ""))
 
             # Convert to final sources list and join snippets
             final_sources = []
@@ -421,11 +319,11 @@ async def chat_stream(
             
         except Exception as e:
             logger.error(f"Critical System Stream Failure: {e}", exc_info=True)
-            err_msg_text = '\n\n[Neural Link RESET_v3]: The system encountered a capacity issue. Please REFRESH/RESTART the analysis session.'
+            # Avoid backslashes in f-strings for Python <3.12 compatibility
+            # We use a clear version label to verify deploy: [RELOAD_v2]
+            err_msg_text = '\n\n[Neural Link RESET_v2]: The system encountered a capacity issue. Please REFRESH/RESTART the analysis session.'
             json_err = json.dumps({'token': err_msg_text})
             yield f"data: {json_err}\n\n"
-        finally:
-            db.close() # Close session only after generator finishes
 
     return StreamingResponse(generate(), media_type="text/event-stream")
 

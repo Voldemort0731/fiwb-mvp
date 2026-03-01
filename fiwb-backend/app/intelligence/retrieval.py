@@ -97,25 +97,12 @@ Rules:
         if material_id:
             focused_filters.append({"key": "user_id", "value": self.user_email, "negate": False})
             
-            # 1. Base ID
-            or_conditions = [{"key": "source_id", "value": material_id, "negate": False}]
-            
-            # 2. Extract Drive ID for fuzzy matching
-            import re
-            drive_id_match = re.search(r'([a-zA-Z0-9_-]{25,})', material_id)
-            if drive_id_match:
-                did = drive_id_match.group(1)
-                or_conditions.extend([
-                    {"key": "source_id", "value": did, "negate": False},
-                    {"key": "source_id", "value": f"ann_att_{did}", "negate": False}
-                ])
-
-            # 3. Handle announcements (parent-child relationship)
+            # Handle announcements (parent-child relationship)
             ann_id_only = material_id.replace("ann_", "") if material_id.startswith("ann_") else None
+            or_conditions = [{"key": "source_id", "value": material_id, "negate": False}]
             if ann_id_only:
                 or_conditions.append({"key": "parent_announcement_id", "value": ann_id_only, "negate": False})
             
-            # Finalize OR block
             focused_filters.append({"OR": or_conditions})
 
         # Helper to skip tasks safely
@@ -150,40 +137,14 @@ Rules:
         def flatten_v3(res):
             if not res or not isinstance(res, dict): return []
             all_chunks = []
-            
-            # Supermemory V3 can return results as a list of 'results' or 'docs'
-            results_list = res.get('results') or res.get('docs') or []
-            
-            for item in results_list:
-                # Grouped Format (V3 default grouped)
-                if 'chunks' in item and isinstance(item['chunks'], list):
-                    doc_id = item.get('documentId') or item.get('id')
-                    doc_meta = item.get('metadata', {})
-                    for chunk in item['chunks']:
-                        chunk_meta = chunk.get('metadata', {})
-                        # Merge: Document metadata (authoritative) + Chunk metadata (contextual)
-                        merged = {**chunk_meta, **doc_meta}
-                        merged['documentId'] = doc_id
-                        # Ensure presence of critical fields from the doc level
-                        for key in ['source_id', 'title', 'source_link', 'course_id', 'type']:
-                            if doc_meta.get(key):
-                                merged[key] = doc_meta[key]
-                        
-                        all_chunks.append({
-                            'content': chunk.get('content', '') or chunk.get('text', ''),
-                            'metadata': merged
-                        })
-                
-                # Flat Format (V3 default flat)
-                else:
-                    chunk_meta = item.get('metadata', {})
-                    chunk_meta['documentId'] = item.get('documentId') or item.get('id')
-                    all_chunks.append({
-                        'content': item.get('content') or item.get('text', ''),
-                        'metadata': chunk_meta
-                    })
-            
-            # logger is available via self.logger or import
+            for doc in res.get('results', []):
+                doc_id = doc.get('documentId')
+                meta = doc.get('metadata', {})
+                for chunk in doc.get('chunks', []):
+                    # Combine doc metadata, chunk metadata, and doc_id
+                    chunk_meta = {**meta, **chunk.get('metadata', {})}
+                    chunk_meta['documentId'] = doc_id
+                    all_chunks.append({"content": chunk.get("content", ""), "metadata": chunk_meta})
             return all_chunks
 
         # Combine focused results into course_context

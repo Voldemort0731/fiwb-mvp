@@ -313,10 +313,8 @@ class LMSSyncService:
 
                 # Index the announcement text itself
                 if force_reindex or item_id not in existing_local_ids:
-                    # Index with announcement title
-                    idx_title = f"{course_name}: {title}"
                     asyncio.create_task(self._index_item(
-                        content, idx_title, content[:1000], item_id, course_id, course_name, professor, "announcement", ann.get('alternateLink')
+                        content, title, content[:1000], item_id, course_id, course_name, professor, "announcement", ann.get('alternateLink')
                     ))
 
                     # Index every Drive file attached to this announcement
@@ -380,7 +378,6 @@ class LMSSyncService:
         """Fire-and-forget Supermemory indexing. Errors here never affect the main sync."""
         try:
             metadata = {
-                "title": title, # ESSENTIAL: Used for source labeling in the UI
                 "user_id": self.user_email,
                 "course_id": course_id,
                 "course_name": course_name,
@@ -503,13 +500,12 @@ class LMSSyncService:
                     )
 
                 metadata = {
-                    "title":                  file_title, # ADDED: Crucial for UI source labeling
                     "user_id":                self.user_email,
                     "course_id":              course_id,
                     "course_name":            course_name,
                     "professor":              professor,
                     "type":                   "announcement_drive_attachment",
-                    "source_id":              f"ann_att_{file_id}",
+                    "source_id":              f"ann_{ann_id}_drive_{file_id}",
                     "source":                 "google_classroom",
                     "source_link":            file_link,
                     "file_title":             file_title,

@@ -8,7 +8,7 @@ import {
     ChevronLeft, ExternalLink,
     Loader2, Copy, Check, Search,
     BookOpen, Lightbulb, MessageSquare,
-    ChevronDown, ArrowRight, RefreshCw, ScanSearch
+    ChevronDown, ArrowRight, RefreshCw
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
@@ -33,7 +33,6 @@ interface Source {
     link?: string;
     snippet?: string;
     source_type?: string;
-    material_id?: string;
 }
 
 interface Message {
@@ -108,12 +107,10 @@ function SourceCard({ source, index }: { source: Source; index: number }) {
 
 /* ─────────────── COMPONENT: Message Renderer ─────────────── */
 
-function MessageContent({ content, onCitationClick, onQuestionClick, sources, onAnalyze }: {
+function MessageContent({ content, onCitationClick, onQuestionClick }: {
     content: string;
     onCitationClick: (page: number) => void;
     onQuestionClick: (question: string) => void;
-    sources?: Source[];
-    onAnalyze?: (materialId: string) => void;
 }) {
     const suggestedQuestions = extractSuggestedQuestions(content);
 
@@ -127,12 +124,6 @@ function MessageContent({ content, onCitationClick, onQuestionClick, sources, on
             break;
         }
     }
-
-    // Remove internal system tags that leak into the UI
-    cleanContent = cleanContent.replace(/\[PERSONAL_REASONING:[\s\S]*?\]\n*/gi, '');
-    cleanContent = cleanContent.replace(/\[DOCUMENTS_REFERENCED:[\s\S]*?\]\n*/gi, '');
-    cleanContent = cleanContent.replace(/\[ANALYSIS_REASONING:[\s\S]*?\]\n*/gi, '');
-    cleanContent = cleanContent.trim();
 
     // Process children to replace [n] patterns with clickable buttons
     const processChildren = (kids: React.ReactNode): React.ReactNode => {
@@ -226,80 +217,6 @@ function MessageContent({ content, onCitationClick, onQuestionClick, sources, on
                     </div>
                 </div>
             )}
-
-            {/* GROUNDING CONTEXT (referred docs) */}
-            {sources && sources.length > 0 && (
-                <div className="mt-6 pt-6 border-t border-white/10 space-y-4">
-                    <div className="flex items-center gap-2 mb-2 px-1">
-                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)] animate-pulse" />
-                        <span className="text-[10px] font-black uppercase text-blue-500 tracking-widest">Grounding Context</span>
-                    </div>
-                    <div className="grid grid-cols-1 gap-3">
-                        {sources.map((source, idx) => {
-                            const displayTitle = source.display || source.title;
-                            // Stable ID for analysis: EXACTLY match how the dashboard works (use DB string ID)
-                            const analyzerId = source.material_id;
-
-                            return (
-                                <motion.div
-                                    key={idx}
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: idx * 0.04 }}
-                                    className="group/source"
-                                >
-                                    <div className="flex flex-col p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-blue-500/40 hover:bg-blue-500/[0.03] transition-all duration-300 relative overflow-hidden">
-                                        <div className="flex items-start justify-between gap-4 mb-3">
-                                            <div className="flex items-center gap-3 min-w-0">
-                                                <div className="w-8 h-8 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 shrink-0 border border-blue-500/20 shadow-inner">
-                                                    <FileText size={14} />
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <h4 className="text-[11px] font-black text-gray-100 line-clamp-1 leading-tight uppercase tracking-tight">
-                                                        {displayTitle}
-                                                    </h4>
-                                                    <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mt-0.5">
-                                                        {source.source_type || "Institutional Material"}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="mt-2 pt-3 border-t border-white/5 flex items-center justify-between gap-4">
-                                            {source.link ? (
-                                                <a
-                                                    href={source.link}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="flex items-center gap-2 text-[9px] font-black text-blue-500 hover:text-blue-400 uppercase tracking-wider transition-colors"
-                                                >
-                                                    <ExternalLink size={10} />
-                                                    View Original
-                                                </a>
-                                            ) : (
-                                                <span className="text-[9px] font-bold text-gray-600 uppercase tracking-wider">Internal Cache</span>
-                                            )}
-
-                                            {analyzerId && onAnalyze && (
-                                                <button
-                                                    onClick={() => onAnalyze(analyzerId)}
-                                                    className="px-3 py-1.5 bg-emerald-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-emerald-400 transition-all flex items-center gap-1.5 shadow-lg shadow-emerald-500/20 active:scale-95 cursor-pointer"
-                                                >
-                                                    <ScanSearch size={11} />
-                                                    Deep Analyze
-                                                </button>
-                                            )}
-                                        </div>
-
-                                        {/* Subtle background glow on hover */}
-                                        <div className="absolute -bottom-10 -right-10 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl group-hover/source:bg-blue-500/10 transition-all duration-500" />
-                                    </div>
-                                </motion.div>
-                            );
-                        })}
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
@@ -390,48 +307,19 @@ function AnalysisBody() {
 
         const fetchMaterial = async () => {
             try {
-                // Use query-param endpoint so Drive URLs are not mangled in the path
-                const params = new URLSearchParams({ material_id: material_id as string, user_email: userEmail! });
-                const res = await fetch(`${API_URL}/api/courses/material?${params.toString()}`);
+                const res = await fetch(`${API_URL}/api/courses/material/${material_id}?user_email=${userEmail}`);
                 const data = await res.json();
                 if (data.error) throw new Error(data.error);
 
                 setMaterial(data);
 
-                // Select the best starting attachment
+                // Select first PDF or any attachment
                 const attachments = data.attachments || [];
-
-                // 1. Try to find a direct match with the requested material_id (for precise Analyze redirects)
-                const mid = material_id as string;
-                let firstDoc = attachments.find((a: any) =>
-                    a.id === mid ||
-                    a.file_id === mid ||
-                    (a.url && a.url.includes(mid)) ||
-                    (mid.includes('drive.google.com') && a.url && a.url.includes(mid.split('/d/')[1]?.split('/')[0]))
-                );
-
-                // 2. Fallback to PDF/Drive filters if no direct match
-                if (!firstDoc) {
-                    firstDoc = attachments.find((a: any) =>
-                        a.title?.toLowerCase().endsWith('.pdf') ||
-                        a.type === 'drive_file' ||
-                        a.file_type === 'pdf' ||
-                        a.driveFile ||
-                        a.url?.includes('drive.google.com') ||
-                        a.alternateLink?.includes('drive.google.com')
-                    ) || attachments[0];
-                }
-
-                // VIRTUAL ATTACHMENT: If no attachment record exists but we have a Drive source link, use it!
-                if (!firstDoc && data.source_link?.includes('drive.google.com')) {
-                    firstDoc = {
-                        id: data.id,
-                        title: data.title,
-                        url: data.source_link,
-                        type: 'drive_file',
-                        file_type: 'pdf'
-                    };
-                }
+                const firstDoc = attachments.find((a: any) =>
+                    a.title?.toLowerCase().endsWith('.pdf') ||
+                    a.type === 'drive_file' ||
+                    a.file_type === 'pdf'
+                ) || attachments[0];
 
                 setActiveAttachment(firstDoc);
             } catch (err) {
@@ -473,20 +361,13 @@ function AnalysisBody() {
 
     // Initial analysis trigger (runs once after material loads, ONLY for new sessions)
     useEffect(() => {
-        if (!material || hasInitialized.current || messages.length > 0) return;
-
-        // Wait until we have an active attachment or it's confirmed text-only
-        if (!activeAttachment && material_id && !material.content) return;
-
+        if (!material || hasInitialized.current || messages.length > 0 || existingThreadId) return;
         hasInitialized.current = true;
 
         const docName = activeAttachment ? activeAttachment.title : material.title;
         const initQuery = `Analyze and summarize this "${docName}". Give an executive summary and suggested inquiries.`;
-
-        // IMPORTANT: We use the active attachment's ID to focus the AI's "Neural Link" on the document content 
-        // rather than just the announcement/metadata text.
-        sendMessage(initQuery);
-    }, [material, activeAttachment, material_id]);
+        sendMessage(initQuery, material.content || "");
+    }, [material, activeAttachment]);
 
     // Copy message content
     const copyMessage = useCallback((content: string, id: string) => {
@@ -540,11 +421,7 @@ function AnalysisBody() {
             formData.append("thread_id", threadId || "new");
             formData.append("query_type", "notebook_analysis");
             if (material?.course_id) formData.append("course_id", material.course_id);
-
-            // PRIORITY: Focus grounding on the document the student is currently viewing.
-            // Use the Drive URL when available (same as 'View Original') for reliable resolution.
-            const focusId = activeAttachment?.url || activeAttachment?.id || material?.source_link || material?.id;
-            if (focusId) formData.append("material_id", focusId);
+            if (material?.id) formData.append("material_id", material.id);
 
             // Pass document content for grounding
             const textToSend = attachmentText || material?.content || "";
@@ -561,7 +438,6 @@ function AnalysisBody() {
             const decoder = new TextDecoder();
             let assistantContent = "";
             let msgSources: Source[] = [];
-            let lineBuffer = "";
 
             setMessages(prev => [...prev, { role: "assistant", content: "", id: "streaming", thinking: true }]);
 
@@ -569,33 +445,25 @@ function AnalysisBody() {
                 const { value, done } = await reader.read();
                 if (done) break;
 
-                const chunk = decoder.decode(value, { stream: true });
-                lineBuffer += chunk;
-
-                const lines = lineBuffer.split("\n");
-                // Keep the last partial line in the buffer
-                lineBuffer = lines.pop() || "";
+                const chunk = decoder.decode(value);
+                const lines = chunk.split("\n");
 
                 for (const line of lines) {
                     if (!line.startsWith("data: ")) continue;
                     const payload = line.substring(6).trim();
-                    if (!payload || payload === "[DONE]") continue;
 
                     if (payload.startsWith("THREAD_ID:")) {
                         const newId = payload.replace("THREAD_ID:", "").trim();
                         setThreadId(newId);
-                        fetchThreads();
+                        fetchThreads(); // Refresh sidebar
                     } else if (payload.startsWith("EVENT:THINKING:")) {
                         setThinkingStep(payload.replace("EVENT:THINKING:", ""));
                     } else if (payload.startsWith("EVENT:SOURCES:")) {
                         try {
-                            const rawJson = payload.replace("EVENT:SOURCES:", "");
-                            const parsedSources = JSON.parse(rawJson);
+                            const parsedSources = JSON.parse(payload.replace("EVENT:SOURCES:", ""));
                             msgSources = parsedSources;
                             setSources(parsedSources);
-                        } catch (e) {
-                            console.error("Sources JSON parse error:", e);
-                        }
+                        } catch (e) { }
                     } else {
                         // Parse token JSON
                         try {
@@ -609,7 +477,6 @@ function AnalysisBody() {
                                         updated[lastIdx] = {
                                             ...updated[lastIdx],
                                             content: assistantContent,
-                                            sources: [...msgSources],
                                             thinking: false
                                         };
                                     }
@@ -617,8 +484,8 @@ function AnalysisBody() {
                                 });
                             }
                         } catch (e) {
-                            // Not JSON, might be raw text or special marker
-                            if (!payload.startsWith("EVENT:")) {
+                            // Not JSON, might be raw text
+                            if (payload && !payload.startsWith("EVENT:") && !payload.startsWith("[DONE]")) {
                                 assistantContent += payload;
                                 setMessages(prev => {
                                     const updated = [...prev];
@@ -627,7 +494,6 @@ function AnalysisBody() {
                                         updated[lastIdx] = {
                                             ...updated[lastIdx],
                                             content: assistantContent,
-                                            sources: [...msgSources],
                                             thinking: false
                                         };
                                     }
@@ -647,7 +513,7 @@ function AnalysisBody() {
                     updated[lastIdx] = {
                         ...updated[lastIdx],
                         content: assistantContent,
-                        sources: [...msgSources], // Persist sources even after stream ends
+                        sources: msgSources,
                         thinking: false,
                         id: Date.now().toString()
                     };
@@ -740,15 +606,6 @@ function AnalysisBody() {
                     </div>
 
                     <div className="flex items-center gap-3">
-                        {threadId && (
-                            <button
-                                onClick={() => router.push(`/chat?thread=${threadId}`)}
-                                className="px-3 py-1.5 flex items-center gap-2 border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300 hover:border-emerald-500/50 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer shadow-[0_0_15px_rgba(16,185,129,0.1)]"
-                            >
-                                <MessageSquare size={12} />
-                                Exit Split View
-                            </button>
-                        )}
                         {sources.length > 0 && (
                             <button
                                 onClick={() => setShowSources(!showSources)}
@@ -799,41 +656,20 @@ function AnalysisBody() {
                         )}
 
                         <div className="flex-1 relative bg-white overflow-hidden">
-                            {activeAttachment ? (() => {
-                                const url = activeAttachment.url || "";
-
-                                // Build the embed URL depending on the Google service
-                                let embedUrl = "";
-                                if (url.includes("docs.google.com/document")) {
-                                    // Google Docs -> /preview
-                                    embedUrl = url.replace(/\/edit.*$/, "/preview").replace(/\/view.*$/, "/preview");
-                                } else if (url.includes("docs.google.com/presentation")) {
-                                    // Google Slides -> /embed
-                                    embedUrl = url.replace(/\/edit.*$/, "/embed").replace(/\/view.*$/, "/embed").replace(/\/pub.*$/, "/embed");
-                                } else if (url.includes("docs.google.com/spreadsheets")) {
-                                    // Google Sheets -> /preview (htmlview)
-                                    embedUrl = url.replace(/\/edit.*$/, "/preview").replace(/\/view.*$/, "/preview");
-                                } else if (url.includes("drive.google.com")) {
-                                    // Raw Drive file -> use backend proxy
-                                    embedUrl = activeAttachment.id
-                                        ? `${API_URL}/api/courses/proxy/drive/${activeAttachment.id}?user_email=${userEmail}`
-                                        : url.replace("/view", "/preview");
-                                } else if (url) {
-                                    // Any other URL -> try direct
-                                    embedUrl = url;
-                                }
-
-                                return (
-                                    <iframe
-                                        key={`${activeAttachment.id || activeAttachment.url}-${userEmail}`}
-                                        ref={iframeRef}
-                                        src={embedUrl}
-                                        className="w-full h-full border-none"
-                                        title="Document Preview"
-                                        allow="autoplay"
-                                    />
-                                );
-                            })() : (
+                            {activeAttachment ? (
+                                <iframe
+                                    key={`${activeAttachment.id}-${userEmail}`}
+                                    ref={iframeRef}
+                                    src={
+                                        activeAttachment.url?.includes('drive.google.com')
+                                            ? `${API_URL}/api/courses/proxy/drive/${activeAttachment.id}?user_email=${userEmail}`
+                                            : activeAttachment.url?.replace('/view', '/preview')
+                                    }
+                                    className="w-full h-full border-none"
+                                    title="Document Preview"
+                                    allow="autoplay"
+                                />
+                            ) : (
                                 <div className="w-full h-full flex flex-col items-center justify-center bg-[#0a0a0a] p-10 text-center">
                                     <div className="w-20 h-20 rounded-3xl bg-white/5 flex items-center justify-center mb-6 border border-white/10">
                                         <FileText size={40} className="text-gray-600" />
@@ -847,7 +683,7 @@ function AnalysisBody() {
                             )}
 
                             {/* Viewer Controls Overlay */}
-                            {activeAttachment?.url && (activeAttachment.url.includes('drive.google.com') || activeAttachment.url.includes('docs.google.com')) && (
+                            {activeAttachment?.url?.includes('drive.google.com') && (
                                 <div className="absolute top-4 right-4 flex items-center gap-2">
                                     <button
                                         onClick={() => {
@@ -973,10 +809,8 @@ function AnalysisBody() {
                                         ) : msg.role === "assistant" ? (
                                             <MessageContent
                                                 content={msg.content}
-                                                sources={msg.sources}
                                                 onCitationClick={navigateToPage}
                                                 onQuestionClick={(q) => sendMessage(q)}
-                                                onAnalyze={(id) => router.push(`/analysis/${id}?thread=${threadId || ""}`)}
                                             />
                                         ) : (
                                             <p className="whitespace-pre-wrap">{msg.content}</p>

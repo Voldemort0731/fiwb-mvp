@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState, useRef, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import {
     Send, Paperclip, Cpu, Zap,
     RefreshCw, ChevronRight, X, FileText,
     Bot, User, MessageCircle, Trash2,
-    Check, BookOpen, Quote, Loader2, ScanSearch
+    Check, BookOpen, Quote, Loader2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Sidebar from "@/components/Sidebar";
@@ -46,15 +46,13 @@ function MessageContent({
     sources,
     reasoning,
     onCitationClick,
-    onInquiryClick,
-    onAnalyze
+    onInquiryClick
 }: {
     content: string;
     sources?: any[];
     reasoning?: string;
     onCitationClick?: (pageNum: string) => void;
     onInquiryClick?: (query: string) => void;
-    onAnalyze?: (materialId: string) => void;
 }) {
     // 1. Extract Suggested Inquiries
     const inquiryRegex = /Suggested Inquiries:\n([\s\S]*?)($|\n\n)/i;
@@ -64,13 +62,7 @@ function MessageContent({
         : [];
 
     // Remove the inquiries block from main content for cleaner markdown view
-    let mainContent = content.replace(inquiryRegex, '').trim();
-
-    // Remove internal system tags that leak into the UI
-    mainContent = mainContent.replace(/\[PERSONAL_REASONING:[\s\S]*?\]\n*/gi, '');
-    mainContent = mainContent.replace(/\[DOCUMENTS_REFERENCED:[\s\S]*?\]\n*/gi, '');
-    mainContent = mainContent.replace(/\[ANALYSIS_REASONING:[\s\S]*?\]\n*/gi, '');
-    mainContent = mainContent.trim();
+    const mainContent = content.replace(inquiryRegex, '').trim();
 
     // Heuristic for citation to page mapping
     // AI usually lists citations at the end: [1] Title [Page 5]
@@ -105,9 +97,7 @@ function MessageContent({
                             if (text.startsWith('[') && text.endsWith(']')) {
                                 const num = text.replace(/[\[\]]/g, '');
                                 if (!isNaN(Number(num))) {
-                                    // Use the mapped page number if it exists, otherwise use the citation number itself as the page
-                                    const page = pageMap[num] || num;
-                                    return <Citation num={num} onClick={() => onCitationClick?.(page)} />;
+                                    return <Citation num={num} onClick={() => onCitationClick?.(pageMap[num] || '1')} />;
                                 }
                             }
                             return <strong>{children}</strong>;
@@ -142,7 +132,7 @@ function MessageContent({
                         <span className="text-[10px] font-black uppercase text-blue-500 tracking-widest">Grounding Context</span>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {sources.map((source: any, idx: number) => {
+                        {sources.map((source, idx) => {
                             const displayTitle = source.display || source.title;
                             return (
                                 <motion.div
@@ -162,7 +152,7 @@ function MessageContent({
                                         <h4 className="text-[11px] font-bold text-gray-100 line-clamp-2 mb-2 leading-tight">
                                             {displayTitle}
                                         </h4>
-                                        <div className="mt-auto pt-2 border-t border-white/5 flex items-center justify-between gap-4">
+                                        <div className="mt-auto pt-2 border-t border-white/5 flex items-center justify-between">
                                             {source.link ? (
                                                 <a
                                                     href={source.link}
@@ -174,16 +164,7 @@ function MessageContent({
                                                     View Original
                                                 </a>
                                             ) : (
-                                                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Internal Context</span>
-                                            )}
-                                            {source.material_id && onAnalyze && (
-                                                <button
-                                                    onClick={() => onAnalyze(source.material_id)}
-                                                    className="flex items-center gap-1.5 text-[9px] font-black text-emerald-400 uppercase tracking-wider hover:text-emerald-300 transition-colors cursor-pointer shrink-0"
-                                                >
-                                                    <ScanSearch size={10} />
-                                                    Analyze
-                                                </button>
+                                                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Internal Reference</span>
                                             )}
                                         </div>
                                     </div>
@@ -200,7 +181,6 @@ function MessageContent({
 import { Sparkles } from "lucide-react";
 
 function ChatBody() {
-    const router = useRouter();
     const [messages, setMessages] = useState<any[]>([]);
     const [threads, setThreads] = useState<any[]>([]);
     const [activeThreadId, setActiveThreadId] = useState<string>("new");
@@ -268,14 +248,8 @@ function ChatBody() {
             window.location.href = "/";
             return;
         }
-        const threadFromUrl = searchParams.get("thread");
-        if (threadFromUrl) {
-            handleThreadSelect(threadFromUrl);
-            fetchThreads(false);
-        } else {
-            fetchThreads(true);
-        }
-    }, [searchParams]);
+        fetchThreads(true);
+    }, []);
 
     useEffect(() => {
         scrollToBottom();
@@ -379,16 +353,7 @@ function ChatBody() {
                         const lineContent = line.replace("data: ", "").trim();
                         if (!lineContent) continue;
 
-                        if (lineContent.startsWith("EVENT:THINKING:")) {
-                            setThinkingStep(lineContent.replace("EVENT:THINKING:", "").trim());
-                            continue;
-                        } else if (lineContent.startsWith("EVENT:SOURCES:")) {
-                            try {
-                                const parsedSources = JSON.parse(lineContent.replace("EVENT:SOURCES:", ""));
-                                accumulatedSources = parsedSources;
-                            } catch (e) { }
-                            continue;
-                        } else if (lineContent.startsWith("EVENT:")) {
+                        if (lineContent.startsWith("EVENT:")) {
                             setThinkingStep(lineContent.replace("EVENT:", "").trim());
                             continue;
                         }
@@ -407,16 +372,12 @@ function ChatBody() {
 
                         setMessages(prev => {
                             const newMsgs = [...prev];
-                            const lastIdx = newMsgs.length - 1;
-                            if (lastIdx >= 0) {
-                                newMsgs[lastIdx] = {
-                                    ...newMsgs[lastIdx],
-                                    content: accumulatedContent,
-                                    reasoning: accumulatedReasoning,
-                                    sources: [...accumulatedSources], // Use fresh copy
-                                    thinking: false
-                                };
-                            }
+                            const last = { ...newMsgs[newMsgs.length - 1] };
+                            last.content = accumulatedContent;
+                            last.reasoning = accumulatedReasoning;
+                            last.sources = accumulatedSources;
+                            last.thinking = false;
+                            newMsgs[newMsgs.length - 1] = last;
                             return newMsgs;
                         });
                     }
@@ -552,14 +513,6 @@ function ChatBody() {
                                                 }
                                             }}
                                             onInquiryClick={(query) => sendMessage(query)}
-                                            onAnalyze={(materialId) => {
-                                                if (activeThreadId && activeThreadId !== "new") {
-                                                    router.push(`/analysis/${materialId}?thread=${activeThreadId}`);
-                                                } else {
-                                                    // If it's a new unsaved chat context, there won't be a thread ID yet
-                                                    // but typically sources only appear after a message is sent, which creates a thread
-                                                }
-                                            }}
                                         />
                                     </div>
                                 </motion.div>
