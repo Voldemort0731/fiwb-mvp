@@ -35,29 +35,29 @@ STRICT RULES:
 9. Mark which materials each concept appears in (use the material titles as source labels).
 
 JSON FORMAT (return exactly this structure):
-{
+{{
   "title": "Course/Topic Name",
   "nodes": [
-    {
+    {{
       "id": "root",
       "label": "Main Topic",
       "level": 0,
       "definition": "Brief 1-sentence definition",
       "citations": [
-        { "source": "Material Title 1", "page": 2, "snippet": "A short relevant quote..." }
+        {{ "source": "Material Title 1", "page": 2, "snippet": "A short relevant quote..." }}
       ]
-    }
+    }}
   ],
   "edges": [
-    {
+    {{
       "id": "e-root-n1",
       "source": "root",
       "target": "n1",
       "label": "includes",
       "type": "hierarchical"
-    }
+    }}
   ]
-}
+}}
 
 edge types: "hierarchical" (parent-child), "related" (conceptual link), "prerequisite" (must learn first)
 Keep the 'source' in citations EXACTLY matching the [MATERIAL: title] provided below.
