@@ -78,6 +78,7 @@ class ChatThread(Base):
     user_id = Column(Integer, ForeignKey("users.id"), index=True)
     title = Column(String)
     material_id = Column(String, nullable=True, index=True) # Links to source doc for analysis threads
+    mindmap_data = Column(Text, nullable=True) # Cached JSON mindmap for this context
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

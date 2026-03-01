@@ -59,6 +59,27 @@ async def list_threads(user_email: str, db: Session = Depends(get_db)):
         "material_id": t.material_id
     } for t in threads]
 
+@router.get("/threads/by-material/{material_id}")
+async def get_thread_by_material(material_id: str, user_email: str, db: Session = Depends(get_db)):
+    actual_email = standardize_email(user_email)
+    user = db.query(User).filter(User.email == actual_email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    thread = db.query(ChatThread).filter(
+        ChatThread.user_id == user.id, 
+        ChatThread.material_id == material_id
+    ).order_by(ChatThread.updated_at.desc()).first()
+    
+    if not thread:
+        return {"id": None}
+        
+    return {
+        "id": thread.id,
+        "title": thread.title,
+        "updated_at": thread.updated_at
+    }
+
 @router.get("/threads/{thread_id}/messages")
 async def get_thread_messages(thread_id: str, user_email: str, db: Session = Depends(get_db)):
     actual_email = standardize_email(user_email)

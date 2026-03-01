@@ -538,7 +538,7 @@ function MindMapBody() {
                                         <iframe
                                             key={`${activeMaterialId}-${activePage}`}
                                             ref={iframeRef}
-                                            src={`${API_URL}/api/courses/proxy/drive/${activeMaterialId}?user_email=${userEmail}${activePage ? `#page=${activePage}` : ""}`}
+                                            src={`${API_URL}/api/courses/proxy/drive/${activeMaterialId}?user_email=${userEmail}&_t=${Date.now()}${activePage ? `#page=${activePage}` : ""}`}
                                             className="w-full h-full border-none bg-white"
                                             title="Document Reader"
                                         />

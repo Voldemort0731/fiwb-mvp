@@ -107,6 +107,23 @@ async def generate_mindmap(
     if not materials:
         raise HTTPException(status_code=404, detail="No materials found for this course. Please sync your course first.")
 
+    # ── CACHING LOGIC ──────────────────────────────────────
+    from app.models import ChatThread
+    target_thread = None
+    # If single document, try to reuse cached mindmap from its analysis thread
+    if material_ids and len(material_ids) == 1:
+        target_thread = db.query(ChatThread).filter(
+            ChatThread.user_id == user.id, 
+            ChatThread.material_id == material_ids[0]
+        ).order_by(ChatThread.updated_at.desc()).first()
+        
+        if target_thread and target_thread.mindmap_data:
+            logger.info(f"[MindMap] Returning cached mind map for material {material_ids[0]}")
+            try:
+                return json.loads(target_thread.mindmap_data)
+            except:
+                pass
+
     # Initialize Drive service for extracting content from attachments
     drive_service = DriveSyncService(user.access_token, user.email, user.refresh_token)
 
@@ -211,7 +228,7 @@ async def generate_mindmap(
         for c in citations:
             c["material_id"] = title_to_file_id.get(c["source"])
 
-    return {
+    final_output = {
         "title": graph_data.get("title", course.name),
         "nodes": nodes,
         "edges": graph_data.get("edges", []),
@@ -219,6 +236,17 @@ async def generate_mindmap(
         "course_name": course.name,
         "total_materials": len(materials)
     }
+
+    # Save to thread if applicable (Individual Material context)
+    if target_thread:
+        try:
+            target_thread.mindmap_data = json.dumps(final_output)
+            db.commit()
+            logger.info(f"[MindMap] Saved generated mind map to thread {target_thread.id}")
+        except Exception as e:
+            logger.error(f"[MindMap] Failed to save mindmap to thread: {e}")
+    
+    return final_output
 
 
 @router.get("/sources/{course_id}")

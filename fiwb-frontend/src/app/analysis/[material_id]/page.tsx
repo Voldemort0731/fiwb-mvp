@@ -263,6 +263,7 @@ function AnalysisBody() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
     const [streaming, setStreaming] = useState(false);
+    const [currentThreadId, setCurrentThreadId] = useState<string | null>(existingThreadId);
     const [threadId, setThreadId] = useState<string | null>(existingThreadId || null);
     const [thinkingStep, setThinkingStep] = useState("");
     const [sources, setSources] = useState<Source[]>([]);
@@ -313,6 +314,19 @@ function AnalysisBody() {
 
                 setMaterial(data);
 
+                // Try to find an existing thread for this material to avoid re-analyzing on reload
+                try {
+                    const tRes = await fetch(`${API_URL}/api/chat/threads/by-material/${material_id}?user_email=${userEmail}`);
+                    const tData = await tRes.json();
+                    if (tData.id) {
+                        setThreadId(tData.id);
+                        setCurrentThreadId(tData.id);
+                        // History will be loaded by the other useEffect as soon as currentThreadId is set
+                    }
+                } catch (e) {
+                    console.error("No existing thread found or search failed", e);
+                }
+
                 // Select first PDF or any attachment
                 const attachments = data.attachments || [];
                 const firstDoc = attachments.find((a: any) =>
@@ -334,11 +348,11 @@ function AnalysisBody() {
 
     // Load existing thread messages (if reopening a saved thread)
     useEffect(() => {
-        if (!existingThreadId || !userEmail) return;
+        if (!currentThreadId || !userEmail) return;
 
         const loadHistory = async () => {
             try {
-                const res = await fetch(`${API_URL}/api/chat/threads/${existingThreadId}/messages?user_email=${userEmail}`);
+                const res = await fetch(`${API_URL}/api/chat/threads/${currentThreadId}/messages?user_email=${userEmail}`);
                 if (!res.ok) return;
                 const data = await res.json();
                 if (data.length > 0) {
@@ -361,7 +375,7 @@ function AnalysisBody() {
 
     // Initial analysis trigger (runs once after material loads, ONLY for new sessions)
     useEffect(() => {
-        if (!material || hasInitialized.current || messages.length > 0 || existingThreadId) return;
+        if (!material || hasInitialized.current || messages.length > 0 || currentThreadId) return;
         hasInitialized.current = true;
 
         const docName = activeAttachment ? activeAttachment.title : material.title;
