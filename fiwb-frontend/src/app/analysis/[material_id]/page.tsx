@@ -377,14 +377,7 @@ function AnalysisBody() {
     }, [currentThreadId, userEmail]);
 
     // Initial analysis trigger (runs once after material loads, ONLY for new sessions)
-    useEffect(() => {
-        if (!material || loadingThread || hasInitialized.current || messages.length > 0 || currentThreadId) return;
-        hasInitialized.current = true;
-
-        const docName = activeAttachment ? activeAttachment.title : material.title;
-        const initQuery = `Analyze and summarize this "${docName}". Give an executive summary and suggested inquiries.`;
-        sendMessage(initQuery, material.content || "");
-    }, [material, activeAttachment]);
+    // MOVED to after sendMessage definition
 
     // Copy message content
     const copyMessage = useCallback((content: string, id: string) => {
@@ -422,7 +415,7 @@ function AnalysisBody() {
     }, [activeAttachment, userEmail]);
 
     // Main send message function
-    const sendMessage = async (query: string, attachmentText?: string) => {
+    const sendMessage = useCallback(async (query: string, attachmentText?: string) => {
         if (!query.trim() || streaming) return;
 
         const userMsg: Message = { role: "user", content: query, id: Date.now().toString() };
@@ -549,7 +542,17 @@ function AnalysisBody() {
             setStreaming(false);
             setThinkingStep("");
         }
-    };
+    }, [userEmail, threadId, material, streaming]); // dependencies for sendMessage
+
+    // Initial analysis trigger (runs once after material loads, ONLY for new sessions)
+    useEffect(() => {
+        if (!material || loadingThread || hasInitialized.current || messages.length > 0 || currentThreadId) return;
+        hasInitialized.current = true;
+
+        const docName = activeAttachment ? activeAttachment.title : material.title;
+        const initQuery = `Analyze and summarize this "${docName}". Give an executive summary and suggested inquiries.`;
+        sendMessage(initQuery, material.content || "");
+    }, [material, activeAttachment, loadingThread, currentThreadId, messages.length, sendMessage]);
 
     /* ─────────────── LOADING STATE ─────────────── */
     if (loading) {
