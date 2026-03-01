@@ -270,14 +270,54 @@ async def chat_stream(
                     for item in c_data.get(cat, []):
                         meta = item.get("metadata", {})
                         
+                        # ── DB FALLBACK ─────────────────────────────────────────────────────
+                        # When Supermemory returns chunks, metadata is sometimes incomplete.
+                        # Use the documentId to look up the real title/link from the local DB.
+                        doc_id = meta.get("documentId") or meta.get("source_id")
+                        if doc_id and (not meta.get("title") or not meta.get("source_link")):
+                            try:
+                                db_mat = None
+                                # Try direct ID match first
+                                db_mat = db.query(Material).filter(Material.id == doc_id).first()
+                                # Try Drive ID extraction if not found
+                                if not db_mat:
+                                    import re as _re
+                                    dm = _re.search(r'([a-zA-Z0-9_-]{25,})', doc_id)
+                                    if dm:
+                                        did2 = dm.group(1)
+                                        db_mat = db.query(Material).filter(
+                                            or_(
+                                                Material.id == did2,
+                                                Material.id.like(f"%{did2}%"),
+                                                Material.source_link.like(f"%{did2}%")
+                                            )
+                                        ).first()
+                                
+                                if db_mat:
+                                    # Enrich the meta dict with authoritative DB data
+                                    meta = {
+                                        **meta,
+                                        "title":       meta.get("title")       or db_mat.title,
+                                        "source_link": meta.get("source_link") or db_mat.source_link,
+                                        "source_id":   meta.get("source_id")   or db_mat.id,
+                                        "id":          meta.get("id")          or db_mat.id,
+                                        "course_id":   meta.get("course_id")   or db_mat.course_id,
+                                        "type":        meta.get("type")        or db_mat.type,
+                                    }
+                            except Exception as _e:
+                                logger.warning(f"[Chat] DB fallback for source meta failed: {_e}")
+                        # ────────────────────────────────────────────────────────────────────
+
                         # Unified Title Logic (Matched with PromptArchitect)
                         course_name = meta.get('course_name') or meta.get('course_id') or ""
                         base_title = meta.get('title') or meta.get('file_name') or meta.get('file_title') or "Institutional Document"
                         full_title = f"{base_title} [{course_name}]" if course_name else base_title
                         
                         # RESOLVE MATERIAL ID (for Analysis button stability)
-                        mat_id = meta.get("id") or meta.get("source_id")
-                        
+                        mat_id = meta.get("source_link") or meta.get("url") if (
+                            meta.get("source_link") and "drive.google.com" in (meta.get("source_link") or "")
+                        ) else (meta.get("id") or meta.get("source_id"))
+
                         if meta.get("type") == "announcement":
                             found_att = False
                             ann_id = meta.get("id")
@@ -286,7 +326,7 @@ async def chat_stream(
                                 for other in c_data.get("course_context", []):
                                     om = other.get("metadata", {})
                                     if om.get("source_id") == ann_id or om.get("parent_announcement_id") == ann_id:
-                                        mat_id = om.get("id")
+                                        mat_id = om.get("source_link") or om.get("id")
                                         found_att = True
                                         break
                                 
@@ -299,21 +339,22 @@ async def chat_stream(
                                                 atts = json.loads(m_record.attachments)
                                                 if atts and len(atts) > 0:
                                                     first_att = atts[0]
-                                                    mat_id = first_att.get("id") or first_att.get("file_id") or first_att.get("fid")
+                                                    # Prefer Drive URL over bare ID for reliable backend resolution
+                                                    mat_id = first_att.get("url") or first_att.get("id") or first_att.get("file_id")
                                                     found_att = True
                                             except: pass
                                         
-                                        # 3. Fallback to broad search if needed
+                                        # 3. Fallback to broad DB search
                                         if not found_att:
                                             child_att = db.query(Material).filter(
                                                 (Material.id.like(f"%{ann_id}%")) | (Material.source_link.like(f"%{ann_id}%")),
                                                 Material.type.in_(["drive_file", "attachment"])
                                             ).first()
                                             if child_att:
-                                                mat_id = child_att.id
+                                                mat_id = child_att.source_link or child_att.id
                                     except: pass
                         
-                        # PRIORITY: If we have a Drive source link, use it for material_id (Analyzer stability)
+                        # Final override: always prefer Drive source_link as the material_id
                         sl = meta.get("source_link") or meta.get("url") or meta.get("webViewLink")
                         if sl and "drive.google.com" in sl:
                             mat_id = sl
@@ -324,13 +365,12 @@ async def chat_stream(
                             sources_dict[dedup_key] = {
                                 "title": full_title,
                                 "display": f"{prefix}{full_title}",
-                                "link": meta.get("source_link") or meta.get("url") or meta.get("webViewLink") or meta.get("link"),
+                                "link": sl or meta.get("link"),
                                 "snippets": [item.get("content", "")],
                                 "source_type": meta.get("type", "document"),
                                 "material_id": mat_id
                             }
                         else:
-                            # Append more snippets (up to 3) for more complete context
                             if len(sources_dict[dedup_key]["snippets"]) < 3:
                                 sources_dict[dedup_key]["snippets"].append(item.get("content", ""))
 
