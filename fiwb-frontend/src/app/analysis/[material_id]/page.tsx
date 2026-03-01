@@ -8,7 +8,7 @@ import {
     ChevronLeft, ExternalLink,
     Loader2, Copy, Check, Search,
     BookOpen, Lightbulb, MessageSquare,
-    ChevronDown, ArrowRight, RefreshCw
+    ChevronDown, ArrowRight, RefreshCw, Network
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import clsx from "clsx";
@@ -621,6 +621,13 @@ function AnalysisBody() {
                                 <ChevronDown size={12} className={clsx("transition-transform", showSources && "rotate-180")} />
                             </button>
                         )}
+                        <button
+                            onClick={() => router.push(`/mindmap/${material?.course_id}?material=${material?.id}`)}
+                            className="px-4 py-1.5 bg-indigo-600/10 hover:bg-indigo-600/20 border border-indigo-500/20 hover:border-indigo-500/40 rounded-lg text-indigo-400 text-[10px] font-black uppercase tracking-widest flex items-center gap-2 transition-all cursor-pointer"
+                        >
+                            <Network size={12} />
+                            Mind Map
+                        </button>
                         <button
                             onClick={() => window.open(material?.source_link, '_blank')}
                             className="p-2 hover:bg-white/5 rounded-lg text-gray-400 hover:text-white transition-colors cursor-pointer"

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback, Suspense } from "react";
+import { useEffect, useState, useCallback, Suspense, useRef } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import {
     ReactFlow,
@@ -25,19 +25,26 @@ import {
     Zap, Network, LayoutGrid, FocusIcon, RefreshCw,
     Search, FileText, MessageSquare, ChevronRight,
     AlignLeft, GitBranch, Circle, CheckCircle2, Info,
-    Download, Eye, Layers
+    Download, Eye, Layers, ArrowRight
 } from "lucide-react";
 import clsx from "clsx";
 import { API_URL } from "@/utils/config";
 
 /* ─────────────── TYPE DEFINITIONS ─────────────── */
 
+interface MindMapCitation {
+    source: string;
+    page?: number;
+    snippet?: string;
+    material_id?: string;
+}
+
 interface MindMapNode {
     id: string;
     label: string;
     level: number;
     definition: string;
-    sources: string[];
+    citations?: MindMapCitation[];
 }
 
 interface MindMapEdge {
@@ -152,13 +159,13 @@ function ConceptNode({ data, selected }: NodeProps) {
                 >
                     {data.label as string}
                 </span>
-                {(data.sources as string[])?.length > 0 && (
+                {(data.citations as any)?.length > 0 && (
                     <div className="mt-2 flex gap-1 flex-wrap justify-center">
-                        {(data.sources as string[]).slice(0, 3).map((src: string, i: number) => (
+                        {(data.citations as any).slice(0, 3).map((cite: MindMapCitation, i: number) => (
                             <span
                                 key={i}
                                 style={{
-                                    fontSize: "8px",
+                                    fontSize: "7px",
                                     background: "rgba(255,255,255,0.2)",
                                     padding: "1px 5px",
                                     borderRadius: "10px",
@@ -170,7 +177,7 @@ function ConceptNode({ data, selected }: NodeProps) {
                                     whiteSpace: "nowrap",
                                 }}
                             >
-                                {src}
+                                {cite.source} {cite.page ? `• p. ${cite.page}` : ""}
                             </span>
                         ))}
                     </div>
@@ -205,30 +212,12 @@ function MindMapBody() {
 
     const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
+    const [activeMaterialId, setActiveMaterialId] = useState<string | null>(null);
+    const [showReader, setShowReader] = useState(false);
 
     const userEmail = typeof window !== "undefined" ? localStorage.getItem("user_email") : null;
     const { fitView, setCenter } = useReactFlow();
-
-    /* ── Fetch sidebar threads ── */
-    useEffect(() => {
-        if (!userEmail) return;
-        fetch(`${API_URL}/api/chat/threads?user_email=${userEmail}`)
-            .then(r => r.json()).then(setThreads).catch(() => { });
-    }, [userEmail]);
-
-    /* ── Fetch available source materials ── */
-    useEffect(() => {
-        if (!course_id || !userEmail) return;
-        setLoading(true);
-        fetch(`${API_URL}/api/mindmap/sources/${course_id}?user_email=${userEmail}`)
-            .then(r => r.json())
-            .then(data => {
-                setAvailableSources(data);
-                setSelectedSourceIds(new Set(data.map((s: SourceMaterial) => s.id)));
-            })
-            .catch(e => setError("Failed to load course materials."))
-            .finally(() => setLoading(false));
-    }, [course_id, userEmail]);
+    const iframeRef = useRef<HTMLIFrameElement>(null);
 
     /* ── Build ReactFlow nodes/edges from graph data ── */
     const buildFlowGraph = useCallback((data: GraphData) => {
@@ -242,7 +231,7 @@ function MindMapBody() {
                 label: n.label,
                 level: n.level,
                 definition: n.definition,
-                sources: n.sources,
+                citations: n.citations,
                 nodeData: n,
             },
             draggable: true,
@@ -283,7 +272,7 @@ function MindMapBody() {
     }, [setNodes, setEdges, fitView]);
 
     /* ── Generate mind map ── */
-    const handleGenerate = async () => {
+    const handleGenerate = useCallback(async (customIds?: string[]) => {
         if (!course_id || !userEmail) return;
         setGenerating(true);
         setError(null);
@@ -297,9 +286,9 @@ function MindMapBody() {
                 body: JSON.stringify({
                     user_email: userEmail,
                     course_id,
-                    material_ids: selectedSourceIds.size > 0
+                    material_ids: customIds || (selectedSourceIds.size > 0
                         ? Array.from(selectedSourceIds)
-                        : undefined,
+                        : undefined),
                 }),
             });
             if (!res.ok) {
@@ -320,13 +309,67 @@ function MindMapBody() {
         } finally {
             setGenerating(false);
         }
-    };
+    }, [course_id, userEmail, selectedSourceIds, buildFlowGraph]);
+
+    /* ── Fetch sidebar threads ── */
+    useEffect(() => {
+        if (!userEmail) return;
+        fetch(`${API_URL}/api/chat/threads?user_email=${userEmail}`)
+            .then(r => r.json()).then(setThreads).catch(() => { });
+    }, [userEmail]);
+
+    const hasAutoGenerated = useRef(false);
+
+    /* ── Fetch available source materials ── */
+    useEffect(() => {
+        if (!course_id || !userEmail) return;
+        setLoading(true);
+        fetch(`${API_URL}/api/mindmap/sources/${course_id}?user_email=${userEmail}`)
+            .then(r => r.json())
+            .then(data => {
+                setAvailableSources(data);
+
+                // If a specific material is requested in URL, select ONLY that one
+                const targetMatId = searchParams.get("material");
+                if (targetMatId) {
+                    setSelectedSourceIds(new Set([targetMatId]));
+                    setActiveMaterialId(targetMatId);
+                    setShowReader(true);
+
+                    if (!hasAutoGenerated.current) {
+                        hasAutoGenerated.current = true;
+                        handleGenerate([targetMatId]);
+                    }
+                } else {
+                    setSelectedSourceIds(new Set(data.map((s: SourceMaterial) => s.id)));
+                }
+            })
+            .catch(e => setError("Failed to load course materials."))
+            .finally(() => setLoading(false));
+    }, [course_id, userEmail, searchParams, handleGenerate]); // handleGenerate is stable due to useCallback
+
+    /* ── Re-fit view when reader is toggled ── */
+    useEffect(() => {
+        if (graphData) {
+            setTimeout(() => fitView({ padding: 0.1, duration: 400 }), 350); // wait for anim
+        }
+    }, [showReader, graphData, fitView]);
 
     /* ── Node click handler ── */
     const handleNodeClick = useCallback((_: any, node: Node) => {
         const nd = node.data.nodeData as MindMapNode;
         setSelectedNode(nd);
         setFocusedNodeId(node.id);
+
+        // Sync with reader: if node has citations, open the first one in the reader
+        if (nd.citations && nd.citations.length > 0) {
+            const firstCite = nd.citations[0];
+            if (firstCite.material_id) {
+                setActiveMaterialId(firstCite.material_id);
+                setShowReader(true);
+            }
+        }
+
         setCenter(node.position.x + 90, node.position.y + 40, { zoom: 1.2, duration: 500 });
     }, [setCenter]);
 
@@ -427,6 +470,20 @@ function MindMapBody() {
                     </div>
 
                     <div className="flex items-center gap-2">
+                        {/* Reader Toggle */}
+                        <button
+                            onClick={() => setShowReader(!showReader)}
+                            className={clsx(
+                                "flex items-center gap-1.5 px-3 py-1.5 border rounded-lg text-xs transition-all",
+                                showReader
+                                    ? "bg-indigo-600/20 border-indigo-500/50 text-indigo-300"
+                                    : "bg-white/5 border-white/10 text-gray-400 hover:text-white"
+                            )}
+                        >
+                            <BookOpen size={12} />
+                            {showReader ? "Hide Reader" : "Split View"}
+                        </button>
+
                         {/* Search */}
                         <div className="relative">
                             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500" />
@@ -459,8 +516,48 @@ function MindMapBody() {
                     </div>
                 </div>
 
-                {/* Main content: Sources sidebar + Graph */}
                 <div className="flex-1 flex overflow-hidden">
+                    {/* Reader Panel (if visible) */}
+                    <AnimatePresence>
+                        {showReader && (
+                            <motion.div
+                                initial={{ width: 0, opacity: 0 }}
+                                animate={{ width: "50%", opacity: 1 }}
+                                exit={{ width: 0, opacity: 0 }}
+                                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                                className="border-r border-white/10 bg-black flex flex-col overflow-hidden"
+                            >
+                                {activeMaterialId ? (
+                                    <div className="flex-1 relative">
+                                        <iframe
+                                            ref={iframeRef}
+                                            src={`${API_URL}/api/courses/proxy/drive/${activeMaterialId}?user_email=${userEmail}`}
+                                            className="w-full h-full border-none bg-white"
+                                            title="Document Reader"
+                                        />
+                                        {/* Reader Header Overlay */}
+                                        <div className="absolute top-0 left-0 right-0 h-10 bg-black/80 backdrop-blur flex items-center justify-between px-4 border-b border-white/5">
+                                            <p className="text-[10px] text-gray-400 font-bold truncate"> Reference: {availableSources.find(s => s.id === activeMaterialId)?.title}</p>
+                                            <button
+                                                onClick={() => setShowReader(false)}
+                                                className="p-1 hover:bg-white/10 rounded"
+                                            >
+                                                <X size={12} className="text-gray-500" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="flex-1 flex flex-col items-center justify-center p-10 text-center text-gray-500">
+                                        <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
+                                            <FileText size={32} />
+                                        </div>
+                                        <h3 className="text-sm font-bold text-white mb-1">Interactive Reader</h3>
+                                        <p className="text-xs">Click any concept node to jump to its source document.</p>
+                                    </div>
+                                )}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                     {/* Left Sources Panel */}
                     <div className="w-72 border-r border-white/5 bg-black/40 backdrop-blur overflow-y-auto flex-shrink-0 flex flex-col">
                         <div className="p-5 border-b border-white/5">
@@ -504,14 +601,9 @@ function MindMapBody() {
                         {/* Generate Button */}
                         <div className="p-5 space-y-3">
                             <button
-                                onClick={handleGenerate}
+                                onClick={() => handleGenerate()}
                                 disabled={generating || selectedSourceIds.size === 0}
-                                className={clsx(
-                                    "w-full flex items-center justify-center gap-2 p-3 rounded-xl font-bold text-sm transition-all",
-                                    generating || selectedSourceIds.size === 0
-                                        ? "bg-white/5 text-gray-500 cursor-not-allowed"
-                                        : "bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-500 hover:to-purple-500 shadow-lg shadow-indigo-500/20 cursor-pointer"
-                                )}
+                                className="w-full flex items-center justify-center gap-2 p-3 rounded-xl font-bold text-sm transition-all bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-500 hover:to-purple-500 shadow-lg shadow-indigo-500/20 cursor-pointer disabled:bg-white/5 disabled:text-gray-500 disabled:cursor-not-allowed"
                             >
                                 {generating ? (
                                     <><Loader2 size={14} className="animate-spin" /> Generating...</>
@@ -733,16 +825,34 @@ function MindMapBody() {
                                     <p className="text-sm text-gray-300 leading-relaxed">{selectedNode.definition || "No definition available."}</p>
                                 </div>
 
-                                {/* Source Materials */}
-                                {selectedNode.sources?.length > 0 && (
+                                {/* Page Citations */}
+                                {selectedNode.citations && selectedNode.citations.length > 0 && (
                                     <div className="p-5 border-b border-white/5">
                                         <p className="text-[9px] font-black uppercase tracking-widest text-cyan-400 mb-3">Found In</p>
                                         <div className="space-y-2">
-                                            {selectedNode.sources.map((src, i) => (
-                                                <div key={i} className="flex items-center gap-2 p-2.5 bg-white/3 rounded-lg border border-white/5">
-                                                    <FileText size={12} className="text-cyan-400 flex-shrink-0" />
-                                                    <span className="text-xs text-gray-300 font-semibold truncate">{src}</span>
-                                                </div>
+                                            {selectedNode.citations.map((cite, i) => (
+                                                <button
+                                                    key={i}
+                                                    onClick={() => {
+                                                        if (cite.material_id) {
+                                                            setActiveMaterialId(cite.material_id);
+                                                            setShowReader(true);
+                                                        }
+                                                    }}
+                                                    className="w-full flex items-center justify-between p-2.5 bg-white/3 hover:bg-white/10 rounded-lg border border-white/5 transition-all text-left cursor-pointer group"
+                                                >
+                                                    <div className="flex items-center gap-2 min-w-0">
+                                                        <FileText size={12} className="text-cyan-400 flex-shrink-0" />
+                                                        <span className="text-xs text-gray-300 font-semibold truncate">{cite.source}</span>
+                                                    </div>
+                                                    {cite.page && (
+                                                        <span className="text-[9px] px-1.5 py-0.5 bg-cyan-500/20 text-cyan-300 rounded font-black border border-cyan-500/20">
+                                                            P. {cite.page}
+                                                        </span>
+                                                    ) || (
+                                                            <ArrowRight size={10} className="text-gray-600 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
+                                                        )}
+                                                </button>
                                             ))}
                                         </div>
                                     </div>

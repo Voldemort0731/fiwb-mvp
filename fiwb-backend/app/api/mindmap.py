@@ -43,14 +43,9 @@ JSON FORMAT (return exactly this structure):
       "label": "Main Topic",
       "level": 0,
       "definition": "Brief 1-sentence definition",
-      "sources": ["Material Title 1", "Material Title 2"]
-    },
-    {
-      "id": "n1",
-      "label": "Subtopic Name",
-      "level": 1,
-      "definition": "Brief 1-sentence definition",
-      "sources": ["Material Title 1"]
+      "citations": [
+        { "source": "Material Title 1", "page": 2, "snippet": "A short relevant quote..." }
+      ]
     }
   ],
   "edges": [
@@ -65,6 +60,8 @@ JSON FORMAT (return exactly this structure):
 }
 
 edge types: "hierarchical" (parent-child), "related" (conceptual link), "prerequisite" (must learn first)
+Keep the 'source' in citations EXACTLY matching the [MATERIAL: title] provided below.
+If a page is mentioned in the [MATERIAL: title] (e.g., PAGE 5), include that number.
 
 COURSE MATERIALS:
 {content}
@@ -182,9 +179,18 @@ async def generate_mindmap(
         logger.error(f"Mind map generation error: {e}")
         raise HTTPException(status_code=500, detail=f"AI generation failed: {str(e)}")
 
+    # ── MAP SOURCES TO TITLES FOR FRONTEND SYNC ────────────────────
+    title_to_id = {m.title: m.id for m in materials}
+    nodes = graph_data.get("nodes", [])
+    
+    for n in nodes:
+        citations = n.get("citations", [])
+        for c in citations:
+            c["material_id"] = title_to_id.get(c["source"])
+
     return {
         "title": graph_data.get("title", course.name),
-        "nodes": graph_data.get("nodes", []),
+        "nodes": nodes,
         "edges": graph_data.get("edges", []),
         "sources": source_list,
         "course_name": course.name,
