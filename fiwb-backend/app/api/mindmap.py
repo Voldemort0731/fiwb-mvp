@@ -12,6 +12,8 @@ from app.utils.email import standardize_email
 from app.utils.clients import SharedClients
 import json
 import logging
+import asyncio
+from app.lms.drive_service import DriveSyncService
 
 logger = logging.getLogger("uvicorn.error")
 router = APIRouter()
@@ -108,6 +110,9 @@ async def generate_mindmap(
     if not materials:
         raise HTTPException(status_code=404, detail="No materials found for this course. Please sync your course first.")
 
+    # Initialize Drive service for extracting content from attachments
+    drive_service = DriveSyncService(user.access_token, user.email, user.refresh_token)
+
     # Build content blocks — cap each at 3000 chars to stay within context
     content_blocks = []
     source_list = []
@@ -117,19 +122,40 @@ async def generate_mindmap(
     for m in materials:
         if total_chars >= MAX_CHARS:
             break
-        block = f"[MATERIAL: {m.title}]\n"
+        
+        material_text = f"[MATERIAL: {m.title}]\n"
         if m.content:
-            block += m.content[:3000]
+            material_text += m.content[:5000] # Use more text if available
         else:
-            block += "(No text content — attachment only)"
-        block += "\n---\n"
-        content_blocks.append(block)
+            material_text += "(No text content)"
+
+        # ── EXTRACT CONTENT FROM ATTACHMENTS ───────────────────────
+        if m.attachments and m.attachments != "[]":
+            try:
+                attachments = json.loads(m.attachments)
+                # Limit to 3 attachments per material to avoid timeouts
+                for att in attachments[:3]:
+                    # Handle both Classroom driveFile and standard Drive format
+                    file_id = att.get("file_id") or att.get("id")
+                    mime_type = att.get("mime_type") or att.get("mimeType")
+                    
+                    if file_id and (att.get("type") in ["drive", "drive_file"] or "google-apps" in str(mime_type) or "pdf" in str(mime_type)):
+                        logger.info(f"[MindMap] Fetching content for attachment: {att.get('title')}")
+                        doc_content = await drive_service._get_file_content({"id": file_id, "mimeType": mime_type or ""})
+                        if doc_content:
+                            material_text += f"\n--- [ATTACHMENT: {att.get('title')}] ---\n"
+                            material_text += doc_content[:5000] # Cap text from attachment
+            except Exception as e:
+                logger.warning(f"[MindMap] Failed to extract attachment content for {m.id}: {e}")
+
+        material_text += "\n---\n"
+        content_blocks.append(material_text)
         source_list.append({
             "id": m.id,
             "title": m.title,
             "type": m.type
         })
-        total_chars += len(block)
+        total_chars += len(material_text)
 
     combined_content = "\n".join(content_blocks)
     prompt = MINDMAP_PROMPT.format(content=combined_content)
