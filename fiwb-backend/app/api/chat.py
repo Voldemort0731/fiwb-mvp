@@ -143,13 +143,25 @@ async def chat_stream(
 
     if thread_id == "new":
         thread_id = str(uuid.uuid4())
-        thread = ChatThread(id=thread_id, user_id=user.id, title=message[:40], material_id=mat_id)
+        thread = ChatThread(
+            id=thread_id, 
+            user_id=user.id, 
+            title=message[:40], 
+            material_id=mat_id,
+            course_id=course_id
+        )
         db.add(thread)
     else:
         thread = db.query(ChatThread).filter(ChatThread.id == thread_id).first()
         if not thread:
             thread_id = str(uuid.uuid4())
-            thread = ChatThread(id=thread_id, user_id=user.id, title=message[:40], material_id=mat_id)
+            thread = ChatThread(
+                id=thread_id, 
+                user_id=user.id, 
+                title=message[:40], 
+                material_id=mat_id,
+                course_id=course_id
+            )
             db.add(thread)
 
     attachment_base64 = None
@@ -184,8 +196,8 @@ async def chat_stream(
     thread.updated_at = datetime.utcnow()
     db.commit()
     
-    # Release core DB session before long-running streaming
-    db.close() 
+    # Do NOT close db here, generate() is a generator that needs the session alive
+    # db.close() 
 
     # 3. Intelligence Multi-tasking
     async def generate():
