@@ -28,40 +28,36 @@ STRICT RULES:
 2. Create 1 root node (the course/topic name).
 3. Create 3 to 6 main topic nodes (level 1).
 4. Create 2 to 4 subtopic nodes per main topic (level 2).
-5. Optionally create 1 to 2 detail nodes per subtopic (level 3) for the most important concepts.
-6. Total nodes: between 15 and 50.
-7. Every node must have a concise definition (1 sentence).
-8. For each edge, include a relationship label (e.g. "includes", "requires", "leads to").
-9. Mark which materials each concept appears in (use the material titles as source labels).
+5. Every node must have a concise definition (1 sentence).
+6. **PRECISE CITATIONS**: For every concept, you MUST identify which document it came from and the EXACT page number.
+   - Look for `--- [PAGE n] ---` and `--- [ATTACHMENT: title] ---` markers in the provided content.
+   - The 'source' in JSON must match the [MATERIAL: title] or [ATTACHMENT: title] provided.
+   - The 'page' must be a number (e.g. 5) extracted from the closest preceding `--- [PAGE n] ---` marker.
 
-JSON FORMAT (return exactly this structure):
+JSON FORMAT:
 {{
   "title": "Course/Topic Name",
   "nodes": [
     {{
-      "id": "root",
-      "label": "Main Topic",
+      "id": "node-unique-id",
+      "label": "Concept Name",
       "level": 0,
-      "definition": "Brief 1-sentence definition",
+      "definition": "...",
       "citations": [
-        {{ "source": "Material Title 1", "page": 2, "snippet": "A short relevant quote..." }}
+        {{ "source": "Material Title", "page": 5, "snippet": "..." }}
       ]
     }}
   ],
   "edges": [
     {{
-      "id": "e-root-n1",
-      "source": "root",
-      "target": "n1",
-      "label": "includes",
-      "type": "hierarchical"
+       "id": "edge-id",
+       "source": "source-id",
+       "target": "target-id",
+       "label": "relationship",
+       "type": "hierarchical"
     }}
   ]
 }}
-
-edge types: "hierarchical" (parent-child), "related" (conceptual link), "prerequisite" (must learn first)
-Keep the 'source' in citations EXACTLY matching the [MATERIAL: title] provided below.
-If a page is mentioned in the [MATERIAL: title] (e.g., PAGE 5), include that number.
 
 COURSE MATERIALS:
 {content}
@@ -116,13 +112,20 @@ async def generate_mindmap(
             ChatThread.user_id == user.id, 
             ChatThread.material_id == material_ids[0]
         ).order_by(ChatThread.updated_at.desc()).first()
-        
-        if target_thread and target_thread.mindmap_data:
-            logger.info(f"[MindMap] Returning cached mind map for material {material_ids[0]}")
-            try:
-                return json.loads(target_thread.mindmap_data)
-            except:
-                pass
+    # Otherwise, check for a course-wide "Global" thread if no subset filter active
+    elif not material_ids:
+        target_thread = db.query(ChatThread).filter(
+            ChatThread.user_id == user.id,
+            ChatThread.course_id == course_id,
+            ChatThread.material_id == None
+        ).order_by(ChatThread.updated_at.desc()).first()
+
+    if target_thread and target_thread.mindmap_data:
+        logger.info(f"[MindMap] Returning cached mind map for context: {material_ids[0] if material_ids else 'Course Global'}")
+        try:
+            return json.loads(target_thread.mindmap_data)
+        except:
+            pass
 
     # Initialize Drive service for extracting content from attachments
     drive_service = DriveSyncService(user.access_token, user.email, user.refresh_token)
@@ -237,12 +240,26 @@ async def generate_mindmap(
         "total_materials": len(materials)
     }
 
-    # Save to thread if applicable (Individual Material context)
-    if target_thread:
+    # Save to thread if applicable (Individual Material or Global Course context)
+    if not material_ids or (material_ids and len(material_ids) == 1):
         try:
-            target_thread.mindmap_data = json.dumps(final_output)
-            db.commit()
-            logger.info(f"[MindMap] Saved generated mind map to thread {target_thread.id}")
+            import uuid
+            # If we don't have a target thread yet (for a global course map), create one
+            if not target_thread and not material_ids:
+                target_thread = ChatThread(
+                    id=str(uuid.uuid4()),
+                    user_id=user.id,
+                    course_id=course_id,
+                    title=f"Course Map: {course.name}",
+                    updated_at=db.query(Course).filter(Course.id == course_id).first().last_synced or datetime.utcnow()
+                )
+                db.add(target_thread)
+                logger.info(f"[MindMap] Created new Global Course Thread for {course_id}")
+
+            if target_thread:
+                target_thread.mindmap_data = json.dumps(final_output)
+                db.commit()
+                logger.info(f"[MindMap] Saved mind map to thread {target_thread.id}")
         except Exception as e:
             logger.error(f"[MindMap] Failed to save mindmap to thread: {e}")
     

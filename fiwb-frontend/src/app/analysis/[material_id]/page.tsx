@@ -257,6 +257,7 @@ function AnalysisBody() {
 
     const [material, setMaterial] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [loadingThread, setLoadingThread] = useState(true);
     const [activeAttachment, setActiveAttachment] = useState<Attachment | null>(null);
 
     // Chat State
@@ -325,6 +326,8 @@ function AnalysisBody() {
                     }
                 } catch (e) {
                     console.error("No existing thread found or search failed", e);
+                } finally {
+                    setLoadingThread(false);
                 }
 
                 // Select first PDF or any attachment
@@ -371,11 +374,11 @@ function AnalysisBody() {
         };
 
         loadHistory();
-    }, [existingThreadId, userEmail]);
+    }, [currentThreadId, userEmail]);
 
     // Initial analysis trigger (runs once after material loads, ONLY for new sessions)
     useEffect(() => {
-        if (!material || hasInitialized.current || messages.length > 0 || currentThreadId) return;
+        if (!material || loadingThread || hasInitialized.current || messages.length > 0 || currentThreadId) return;
         hasInitialized.current = true;
 
         const docName = activeAttachment ? activeAttachment.title : material.title;
