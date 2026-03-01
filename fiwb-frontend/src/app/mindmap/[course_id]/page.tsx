@@ -303,14 +303,20 @@ function MindMapBody() {
                 }),
             });
             if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.detail || "Generation failed");
+                let errMsg = "Generation failed";
+                try { const err = await res.json(); errMsg = err.detail || errMsg; } catch { }
+                throw new Error(errMsg);
             }
             const data: GraphData = await res.json();
             setGraphData(data);
             buildFlowGraph(data);
         } catch (e: any) {
-            setError(e.message || "Failed to generate mind map");
+            const msg = e.message || "";
+            if (msg === "Failed to fetch" || msg.includes("NetworkError") || msg.includes("fetch")) {
+                setError("Backend is starting up — please wait 10 seconds and try again.");
+            } else {
+                setError(msg || "Failed to generate mind map");
+            }
         } finally {
             setGenerating(false);
         }
