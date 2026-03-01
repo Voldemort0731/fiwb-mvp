@@ -107,9 +107,20 @@ async def generate_mindmap(
     if not materials:
         raise HTTPException(status_code=404, detail="No materials found for this course. Please sync your course first.")
 
+    # ── CHECK CACHE (ONLY for single material requests) ────────────
+    if material_ids and len(material_ids) == 1:
+        target_material = db.query(Material).filter(Material.id == material_ids[0]).first()
+        if target_material and target_material.mindmap_cached:
+            try:
+                cached_data = json.loads(target_material.mindmap_cached)
+                logger.info(f"[MindMap] Returning cached data for material: {target_material.id}")
+                return cached_data
+            except Exception as e:
+                logger.warning(f"[MindMap] Failed to load cached data: {e}")
+
     # Initialize Drive service for extracting content from attachments
     drive_service = DriveSyncService(user.access_token, user.email, user.refresh_token)
-
+    
     # Build content blocks — cap each at 3000 chars to stay within context
     content_blocks = []
     source_list = []
@@ -186,22 +197,18 @@ async def generate_mindmap(
         raise HTTPException(status_code=500, detail=f"AI generation failed: {str(e)}")
 
     # ── MAP SOURCES TO GOOGLE FILE IDs FOR FRONTEND READER ─────────
-    # We want to map the material title back to the ACTUAL Google Drive file_id
-    # so the frontend split-view reader can open it.
     title_to_file_id = {}
     for m in materials:
         if m.attachments and m.attachments != "[]":
             try:
                 atts = json.loads(m.attachments)
                 if atts:
-                    # Prefer PDF/Drive file IDs
                     primary = atts[0]
                     fid = primary.get("file_id") or primary.get("id")
                     if fid:
                         title_to_file_id[m.title] = fid
             except:
                 pass
-        # Fallback to database ID if no attachment (though proxy won't work for text-only anyway)
         if m.title not in title_to_file_id:
             title_to_file_id[m.title] = m.id
 
@@ -211,7 +218,7 @@ async def generate_mindmap(
         for c in citations:
             c["material_id"] = title_to_file_id.get(c["source"])
 
-    return {
+    final_result = {
         "title": graph_data.get("title", course.name),
         "nodes": nodes,
         "edges": graph_data.get("edges", []),
@@ -219,6 +226,15 @@ async def generate_mindmap(
         "course_name": course.name,
         "total_materials": len(materials)
     }
+
+    # ── SAVE TO CACHE ──────────────────────────────────────────────
+    if material_ids and len(material_ids) == 1:
+        target_material = db.query(Material).filter(Material.id == material_ids[0]).first()
+        if target_material:
+            target_material.mindmap_cached = json.dumps(final_result)
+            db.commit()
+
+    return final_result
 
 
 @router.get("/sources/{course_id}")

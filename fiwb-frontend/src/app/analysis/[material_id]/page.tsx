@@ -264,6 +264,7 @@ function AnalysisBody() {
     const [input, setInput] = useState("");
     const [streaming, setStreaming] = useState(false);
     const [threadId, setThreadId] = useState<string | null>(existingThreadId || null);
+    const [loadingThread, setLoadingThread] = useState(true);
     const [thinkingStep, setThinkingStep] = useState("");
     const [sources, setSources] = useState<Source[]>([]);
     const [showSources, setShowSources] = useState(false);
@@ -313,6 +314,23 @@ function AnalysisBody() {
 
                 setMaterial(data);
 
+                // Try to find an existing thread for this material to avoid re-analyzing on reload
+                if (!existingThreadId) {
+                    try {
+                        const tRes = await fetch(`${API_URL}/api/chat/threads/by-material/${material_id}?user_email=${userEmail}`);
+                        const tData = await tRes.json();
+                        if (tData.id) {
+                            setThreadId(tData.id);
+                        }
+                    } catch (e) {
+                        console.error("No existing thread found or search failed", e);
+                    } finally {
+                        setLoadingThread(false);
+                    }
+                } else {
+                    setLoadingThread(false);
+                }
+
                 // Select first PDF or any attachment
                 const attachments = data.attachments || [];
                 const firstDoc = attachments.find((a: any) =>
@@ -324,21 +342,22 @@ function AnalysisBody() {
                 setActiveAttachment(firstDoc);
             } catch (err) {
                 console.error("Failed to load material:", err);
+                setLoadingThread(false);
             } finally {
                 setLoading(false);
             }
         };
 
         fetchMaterial();
-    }, [material_id, userEmail]);
+    }, [material_id, userEmail, existingThreadId]);
 
     // Load existing thread messages (if reopening a saved thread)
     useEffect(() => {
-        if (!existingThreadId || !userEmail) return;
+        if (!threadId || !userEmail) return;
 
         const loadHistory = async () => {
             try {
-                const res = await fetch(`${API_URL}/api/chat/threads/${existingThreadId}/messages?user_email=${userEmail}`);
+                const res = await fetch(`${API_URL}/api/chat/threads/${threadId}/messages?user_email=${userEmail}`);
                 if (!res.ok) return;
                 const data = await res.json();
                 if (data.length > 0) {
@@ -349,25 +368,24 @@ function AnalysisBody() {
                         id: `loaded-${i}`
                     }));
                     setMessages(loaded);
-                    hasInitialized.current = true; // Don't auto-trigger analysis
                 }
             } catch (e) {
-                console.error("Failed to load thread history:", e);
+                console.error("Failed to load history:", e);
             }
         };
 
         loadHistory();
-    }, [existingThreadId, userEmail]);
+    }, [threadId, userEmail]);
 
     // Initial analysis trigger (runs once after material loads, ONLY for new sessions)
     useEffect(() => {
-        if (!material || hasInitialized.current || messages.length > 0 || existingThreadId) return;
+        if (!material || loadingThread || hasInitialized.current || messages.length > 0 || threadId) return;
         hasInitialized.current = true;
 
         const docName = activeAttachment ? activeAttachment.title : material.title;
         const initQuery = `Analyze and summarize this "${docName}". Give an executive summary and suggested inquiries.`;
         sendMessage(initQuery, material.content || "");
-    }, [material, activeAttachment]);
+    }, [material, activeAttachment, loadingThread, threadId, messages.length]);
 
     // Copy message content
     const copyMessage = useCallback((content: string, id: string) => {

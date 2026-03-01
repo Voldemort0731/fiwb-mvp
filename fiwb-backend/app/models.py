@@ -67,6 +67,7 @@ class Material(Base):
     created_at = Column(String, nullable=True) # ISO Timestamp
     attachments = Column(Text, default="[]") # JSON string of attachments
     source_link = Column(String, nullable=True)
+    mindmap_cached = Column(Text, nullable=True) # JSON cached data
 
     course = relationship("Course", back_populates="materials")
     user = relationship("User", back_populates="materials")
