@@ -9,7 +9,7 @@ from sqlalchemy import or_
 from app.database import get_db
 from app.models import User, Course, Material
 from app.utils.email import standardize_email
-from app.intelligence.clients import SharedClients
+from app.utils.clients import SharedClients
 import json
 import logging
 
