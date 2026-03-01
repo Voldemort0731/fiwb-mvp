@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback, useRef, Suspense } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
 import { useParams, useSearchParams, useRouter } from "next/navigation";
 import {
     ReactFlow,
@@ -8,18 +8,16 @@ import {
     MiniMap,
     useNodesState,
     useEdgesState,
-    addEdge,
     MarkerType,
-    Panel,
     useReactFlow,
     ReactFlowProvider,
     Handle,
     Position,
-    NodeProps,
-    Edge,
-    Node,
+    type NodeProps,
+    type Edge,
+    type Node,
 } from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
+
 import Sidebar from "@/components/Sidebar";
 import { motion, AnimatePresence } from "framer-motion";
 import {
