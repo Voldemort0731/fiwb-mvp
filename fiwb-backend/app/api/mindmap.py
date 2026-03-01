@@ -179,14 +179,31 @@ async def generate_mindmap(
         logger.error(f"Mind map generation error: {e}")
         raise HTTPException(status_code=500, detail=f"AI generation failed: {str(e)}")
 
-    # ── MAP SOURCES TO TITLES FOR FRONTEND SYNC ────────────────────
-    title_to_id = {m.title: m.id for m in materials}
+    # ── MAP SOURCES TO GOOGLE FILE IDs FOR FRONTEND READER ─────────
+    # We want to map the material title back to the ACTUAL Google Drive file_id
+    # so the frontend split-view reader can open it.
+    title_to_file_id = {}
+    for m in materials:
+        if m.attachments and m.attachments != "[]":
+            try:
+                atts = json.loads(m.attachments)
+                if atts:
+                    # Prefer PDF/Drive file IDs
+                    primary = atts[0]
+                    fid = primary.get("file_id") or primary.get("id")
+                    if fid:
+                        title_to_file_id[m.title] = fid
+            except:
+                pass
+        # Fallback to database ID if no attachment (though proxy won't work for text-only anyway)
+        if m.title not in title_to_file_id:
+            title_to_file_id[m.title] = m.id
+
     nodes = graph_data.get("nodes", [])
-    
     for n in nodes:
         citations = n.get("citations", [])
         for c in citations:
-            c["material_id"] = title_to_id.get(c["source"])
+            c["material_id"] = title_to_file_id.get(c["source"])
 
     return {
         "title": graph_data.get("title", course.name),
@@ -215,4 +232,21 @@ def get_mindmap_sources(course_id: str, user_email: str, db: Session = Depends(g
         or_(Material.user_id == user.id, Material.user_id == None)
     ).order_by(Material.created_at.desc()).all()
 
-    return [{"id": m.id, "title": m.title, "type": m.type} for m in materials]
+    results = []
+    for m in materials:
+        fid = None
+        if m.attachments and m.attachments != "[]":
+            try:
+                atts = json.loads(m.attachments)
+                if atts:
+                    primary = atts[0]
+                    fid = primary.get("file_id") or primary.get("id")
+            except:
+                pass
+        results.append({
+            "id": m.id, 
+            "title": m.title, 
+            "type": m.type,
+            "file_id": fid
+        })
+    return results
