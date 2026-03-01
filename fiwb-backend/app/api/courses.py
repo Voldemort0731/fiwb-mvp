@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import or_
+from sqlalchemy import or_, case
 from app.database import get_db
 from app.models import Course, User, Material
 from app.utils.email import standardize_email
@@ -180,6 +180,7 @@ def get_material(material_id: str, user_email: str, db: Session = Depends(get_db
         if drive_id_match:
             did = drive_id_match.group(1)
             # Try finding by ID directly, with prefixes, or inside source link
+            # PRIORITY: Prefer materials that are actually drive files or attachments
             m = db.query(Material).filter(
                 or_(
                     Material.id == did,
@@ -187,6 +188,11 @@ def get_material(material_id: str, user_email: str, db: Session = Depends(get_db
                     Material.source_link.like(f"%{did}%")
                 ),
                 or_(Material.user_id == user.id, Material.user_id == None)
+            ).order_by(
+                case(
+                    (Material.type.in_(["drive_file", "attachment"]), 0),
+                    else_=1
+                )
             ).first()
     
     if not m:
@@ -195,6 +201,9 @@ def get_material(material_id: str, user_email: str, db: Session = Depends(get_db
             Material.source_link.like(f"%{material_id}%"),
             or_(Material.user_id == user.id, Material.user_id == None)
         ).first()
+
+    if not m:
+        raise HTTPException(status_code=404, detail="Material not found in your academic vault. Please ensure the course is synced.")
 
     try:
         raw_atts = json.loads(m.attachments) if m.attachments else []

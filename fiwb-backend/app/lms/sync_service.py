@@ -313,8 +313,10 @@ class LMSSyncService:
 
                 # Index the announcement text itself
                 if force_reindex or item_id not in existing_local_ids:
+                    # Index with announcement title
+                    idx_title = f"{course_name}: {title}"
                     asyncio.create_task(self._index_item(
-                        content, title, content[:1000], item_id, course_id, course_name, professor, "announcement", ann.get('alternateLink')
+                        content, idx_title, content[:1000], item_id, course_id, course_name, professor, "announcement", ann.get('alternateLink')
                     ))
 
                     # Index every Drive file attached to this announcement
@@ -501,6 +503,7 @@ class LMSSyncService:
                     )
 
                 metadata = {
+                    "title":                  file_title, # ADDED: Crucial for UI source labeling
                     "user_id":                self.user_email,
                     "course_id":              course_id,
                     "course_name":            course_name,

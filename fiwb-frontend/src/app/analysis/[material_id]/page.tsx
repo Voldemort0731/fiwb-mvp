@@ -229,55 +229,70 @@ function MessageContent({ content, onCitationClick, onQuestionClick, sources, on
 
             {/* GROUNDING CONTEXT (referred docs) */}
             {sources && sources.length > 0 && (
-                <div className="mt-6 pt-6 border-t border-white/5 space-y-4">
-                    <div className="flex items-center gap-2 mb-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+                <div className="mt-6 pt-6 border-t border-white/10 space-y-4">
+                    <div className="flex items-center gap-2 mb-2 px-1">
+                        <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)] animate-pulse" />
                         <span className="text-[10px] font-black uppercase text-blue-500 tracking-widest">Grounding Context</span>
                     </div>
                     <div className="grid grid-cols-1 gap-3">
                         {sources.map((source, idx) => {
                             const displayTitle = source.display || source.title;
+                            // Stable ID for analysis: Prefer the Drive link if it exists, as the backend resolved it
+                            const analyzerId = source.material_id || source.link;
+
                             return (
                                 <motion.div
                                     key={idx}
-                                    initial={{ opacity: 0, scale: 0.95 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    transition={{ delay: idx * 0.03 }}
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: idx * 0.04 }}
                                     className="group/source"
                                 >
-                                    <div className="flex flex-col p-3 rounded-2xl glass-dark border border-white/5 bg-black/40 hover:border-blue-500/40 hover:bg-blue-500/[0.02] transition-all duration-300">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <div className="p-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-500">
-                                                <FileText size={14} />
+                                    <div className="flex flex-col p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-blue-500/40 hover:bg-blue-500/[0.03] transition-all duration-300 relative overflow-hidden">
+                                        <div className="flex items-start justify-between gap-4 mb-3">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className="w-8 h-8 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 shrink-0 border border-blue-500/20 shadow-inner">
+                                                    <FileText size={14} />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <h4 className="text-[11px] font-black text-gray-100 line-clamp-1 leading-tight uppercase tracking-tight">
+                                                        {displayTitle}
+                                                    </h4>
+                                                    <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mt-0.5">
+                                                        {source.source_type || "Institutional Material"}
+                                                    </p>
+                                                </div>
                                             </div>
                                         </div>
-                                        <h4 className="text-[11px] font-bold text-gray-100 line-clamp-2 mb-2 leading-tight">
-                                            {displayTitle}
-                                        </h4>
-                                        <div className="mt-auto pt-2 border-t border-white/5 flex items-center justify-between gap-4">
+
+                                        <div className="mt-2 pt-3 border-t border-white/5 flex items-center justify-between gap-4">
                                             {source.link ? (
                                                 <a
                                                     href={source.link}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="flex items-center gap-1.5 text-[9px] font-black text-blue-500 uppercase tracking-wider hover:text-blue-600 transition-colors"
+                                                    className="flex items-center gap-2 text-[9px] font-black text-blue-500 hover:text-blue-400 uppercase tracking-wider transition-colors"
                                                 >
-                                                    <BookOpen size={10} />
+                                                    <ExternalLink size={10} />
                                                     View Original
                                                 </a>
                                             ) : (
-                                                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">Internal Context</span>
+                                                <span className="text-[9px] font-bold text-gray-600 uppercase tracking-wider">Internal Cache</span>
                                             )}
-                                            {source.material_id && onAnalyze && (
+
+                                            {analyzerId && onAnalyze && (
                                                 <button
-                                                    onClick={() => onAnalyze(source.material_id!)}
-                                                    className="flex items-center gap-1.5 text-[9px] font-black text-emerald-400 uppercase tracking-wider hover:text-emerald-300 transition-colors cursor-pointer shrink-0"
+                                                    onClick={() => onAnalyze(analyzerId)}
+                                                    className="px-3 py-1.5 bg-emerald-500 text-white rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-emerald-400 transition-all flex items-center gap-1.5 shadow-lg shadow-emerald-500/20 active:scale-95 cursor-pointer"
                                                 >
-                                                    <ScanSearch size={10} />
-                                                    Analyze
+                                                    <ScanSearch size={11} />
+                                                    Deep Analyze
                                                 </button>
                                             )}
                                         </div>
+
+                                        {/* Subtle background glow on hover */}
+                                        <div className="absolute -bottom-10 -right-10 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl group-hover/source:bg-blue-500/10 transition-all duration-500" />
                                     </div>
                                 </motion.div>
                             );
@@ -381,16 +396,29 @@ function AnalysisBody() {
 
                 setMaterial(data);
 
-                // Select first PDF or any attachment
+                // Select the best starting attachment
                 const attachments = data.attachments || [];
+
+                // 1. Try to find a direct match with the requested material_id (for precise Analyze redirects)
+                const mid = material_id as string;
                 let firstDoc = attachments.find((a: any) =>
-                    a.title?.toLowerCase().endsWith('.pdf') ||
-                    a.type === 'drive_file' ||
-                    a.file_type === 'pdf' ||
-                    a.driveFile ||
-                    a.url?.includes('drive.google.com') ||
-                    a.alternateLink?.includes('drive.google.com')
-                ) || attachments[0];
+                    a.id === mid ||
+                    a.file_id === mid ||
+                    (a.url && a.url.includes(mid)) ||
+                    (mid.includes('drive.google.com') && a.url && a.url.includes(mid.split('/d/')[1]?.split('/')[0]))
+                );
+
+                // 2. Fallback to PDF/Drive filters if no direct match
+                if (!firstDoc) {
+                    firstDoc = attachments.find((a: any) =>
+                        a.title?.toLowerCase().endsWith('.pdf') ||
+                        a.type === 'drive_file' ||
+                        a.file_type === 'pdf' ||
+                        a.driveFile ||
+                        a.url?.includes('drive.google.com') ||
+                        a.alternateLink?.includes('drive.google.com')
+                    ) || attachments[0];
+                }
 
                 // VIRTUAL ATTACHMENT: If no attachment record exists but we have a Drive source link, use it!
                 if (!firstDoc && data.source_link?.includes('drive.google.com')) {
@@ -530,6 +558,7 @@ function AnalysisBody() {
             const decoder = new TextDecoder();
             let assistantContent = "";
             let msgSources: Source[] = [];
+            let lineBuffer = "";
 
             setMessages(prev => [...prev, { role: "assistant", content: "", id: "streaming", thinking: true }]);
 
@@ -537,25 +566,33 @@ function AnalysisBody() {
                 const { value, done } = await reader.read();
                 if (done) break;
 
-                const chunk = decoder.decode(value);
-                const lines = chunk.split("\n");
+                const chunk = decoder.decode(value, { stream: true });
+                lineBuffer += chunk;
+
+                const lines = lineBuffer.split("\n");
+                // Keep the last partial line in the buffer
+                lineBuffer = lines.pop() || "";
 
                 for (const line of lines) {
                     if (!line.startsWith("data: ")) continue;
                     const payload = line.substring(6).trim();
+                    if (!payload || payload === "[DONE]") continue;
 
                     if (payload.startsWith("THREAD_ID:")) {
                         const newId = payload.replace("THREAD_ID:", "").trim();
                         setThreadId(newId);
-                        fetchThreads(); // Refresh sidebar
+                        fetchThreads();
                     } else if (payload.startsWith("EVENT:THINKING:")) {
                         setThinkingStep(payload.replace("EVENT:THINKING:", ""));
                     } else if (payload.startsWith("EVENT:SOURCES:")) {
                         try {
-                            const parsedSources = JSON.parse(payload.replace("EVENT:SOURCES:", ""));
+                            const rawJson = payload.replace("EVENT:SOURCES:", "");
+                            const parsedSources = JSON.parse(rawJson);
                             msgSources = parsedSources;
                             setSources(parsedSources);
-                        } catch (e) { }
+                        } catch (e) {
+                            console.error("Sources JSON parse error:", e);
+                        }
                     } else {
                         // Parse token JSON
                         try {
@@ -577,8 +614,8 @@ function AnalysisBody() {
                                 });
                             }
                         } catch (e) {
-                            // Not JSON, might be raw text
-                            if (payload && !payload.startsWith("EVENT:") && !payload.startsWith("[DONE]")) {
+                            // Not JSON, might be raw text or special marker
+                            if (!payload.startsWith("EVENT:")) {
                                 assistantContent += payload;
                                 setMessages(prev => {
                                     const updated = [...prev];

@@ -272,9 +272,10 @@ async def chat_stream(
                         
                         # Unified Title Logic (Matched with PromptArchitect)
                         course_name = meta.get('course_name') or meta.get('course_id') or ""
-                        base_title = meta.get('title') or meta.get('file_name') or "Institutional Document"
+                        base_title = meta.get('title') or meta.get('file_name') or meta.get('file_title') or "Institutional Document"
                         full_title = f"{base_title} [{course_name}]" if course_name else base_title
                         
+                        # RESOLVE MATERIAL ID (for Analysis button stability)
                         mat_id = meta.get("id") or meta.get("source_id")
                         
                         if meta.get("type") == "announcement":
@@ -298,7 +299,7 @@ async def chat_stream(
                                                 atts = json.loads(m_record.attachments)
                                                 if atts and len(atts) > 0:
                                                     first_att = atts[0]
-                                                    mat_id = first_att.get("id") or first_att.get("file_id") or first_att.get("fid") # check all variants
+                                                    mat_id = first_att.get("id") or first_att.get("file_id") or first_att.get("fid")
                                                     found_att = True
                                             except: pass
                                         
@@ -317,8 +318,10 @@ async def chat_stream(
                         if sl and "drive.google.com" in sl:
                             mat_id = sl
 
-                        if full_title not in sources_dict:
-                            sources_dict[full_title] = {
+                        # DEDUPLICATION LOGIC: Group by ID if available, otherwise title
+                        dedup_key = mat_id or full_title
+                        if dedup_key not in sources_dict:
+                            sources_dict[dedup_key] = {
                                 "title": full_title,
                                 "display": f"{prefix}{full_title}",
                                 "link": meta.get("source_link") or meta.get("url") or meta.get("webViewLink") or meta.get("link"),
@@ -328,8 +331,8 @@ async def chat_stream(
                             }
                         else:
                             # Append more snippets (up to 3) for more complete context
-                            if len(sources_dict[full_title]["snippets"]) < 3:
-                                sources_dict[full_title]["snippets"].append(item.get("content", ""))
+                            if len(sources_dict[dedup_key]["snippets"]) < 3:
+                                sources_dict[dedup_key]["snippets"].append(item.get("content", ""))
 
             # Convert to final sources list and join snippets
             final_sources = []
