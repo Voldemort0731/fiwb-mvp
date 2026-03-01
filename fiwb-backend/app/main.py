@@ -8,11 +8,6 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import settings
-from app.database import engine, Base
-import app.models # Ensure models are loaded
-
-# Initialize database schema automatically (Single-process/Scale mode)
-Base.metadata.create_all(bind=engine)
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
