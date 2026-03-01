@@ -151,13 +151,22 @@ Rules:
             if not res or not isinstance(res, dict): return []
             all_chunks = []
             for doc in res.get('results', []):
-                doc_id = doc.get('documentId')
-                meta = doc.get('metadata', {})
+                doc_id   = doc.get('documentId')
+                doc_meta = doc.get('metadata', {})  # ← Our stored metadata (title, source_id, etc.)
                 for chunk in doc.get('chunks', []):
-                    # Combine doc metadata, chunk metadata, and doc_id
-                    chunk_meta = {**meta, **chunk.get('metadata', {})}
-                    chunk_meta['documentId'] = doc_id
-                    all_chunks.append({"content": chunk.get("content", ""), "metadata": chunk_meta})
+                    chunk_meta = chunk.get('metadata', {})
+                    # CRITICAL: doc_meta takes PRIORITY over chunk_meta.
+                    # Chunk metadata is often generic and would overwrite our rich stored metadata.
+                    merged = {**chunk_meta, **doc_meta}
+                    # Always preserve these from the document level (never let chunks override)
+                    merged['documentId'] = doc_id
+                    if doc_meta.get('source_id'):
+                        merged['source_id'] = doc_meta['source_id']
+                    if doc_meta.get('title'):
+                        merged['title'] = doc_meta['title']
+                    if doc_meta.get('source_link'):
+                        merged['source_link'] = doc_meta['source_link']
+                    all_chunks.append({"content": chunk.get("content", ""), "metadata": merged})
             return all_chunks
 
         # Combine focused results into course_context

@@ -270,31 +270,30 @@ async def chat_stream(
                     for item in c_data.get(cat, []):
                         meta = item.get("metadata", {})
                         
-                        # ── DB FALLBACK ─────────────────────────────────────────────────────
-                        # When Supermemory returns chunks, metadata is sometimes incomplete.
-                        # Use the documentId to look up the real title/link from the local DB.
-                        doc_id = meta.get("documentId") or meta.get("source_id")
-                        if doc_id and (not meta.get("title") or not meta.get("source_link")):
+                        # ── DB FALLBACK: Enrich incomplete Supermemory metadata from local DB ──
+                        # The retrieval.py fix ensures doc-level metadata wins, but for old indexed
+                        # content that may be missing fields, we do a DB lookup using source_id.
+                        source_id_key = meta.get("source_id")
+                        if source_id_key and (not meta.get("title") or not meta.get("source_link")):
                             try:
-                                db_mat = None
-                                # Try direct ID match first
-                                db_mat = db.query(Material).filter(Material.id == doc_id).first()
-                                # Try Drive ID extraction if not found
+                                import re as _re
+                                db_mat = db.query(Material).filter(Material.id == source_id_key).first()
                                 if not db_mat:
-                                    import re as _re
-                                    dm = _re.search(r'([a-zA-Z0-9_-]{25,})', doc_id)
+                                    # Drive ID extraction (for ann_att_ prefixed IDs)
+                                    dm = _re.search(r'([a-zA-Z0-9_-]{25,})', source_id_key)
                                     if dm:
                                         did2 = dm.group(1)
+                                        from sqlalchemy import case as _case
                                         db_mat = db.query(Material).filter(
                                             or_(
                                                 Material.id == did2,
                                                 Material.id.like(f"%{did2}%"),
                                                 Material.source_link.like(f"%{did2}%")
                                             )
+                                        ).order_by(
+                                            _case((Material.type.in_(["drive_file", "attachment"]), 0), else_=1)
                                         ).first()
-                                
                                 if db_mat:
-                                    # Enrich the meta dict with authoritative DB data
                                     meta = {
                                         **meta,
                                         "title":       meta.get("title")       or db_mat.title,
@@ -305,46 +304,49 @@ async def chat_stream(
                                         "type":        meta.get("type")        or db_mat.type,
                                     }
                             except Exception as _e:
-                                logger.warning(f"[Chat] DB fallback for source meta failed: {_e}")
-                        # ────────────────────────────────────────────────────────────────────
+                                logger.warning(f"[Chat] DB fallback failed: {_e}")
+                        # ─────────────────────────────────────────────────────────────────────
 
-                        # Unified Title Logic (Matched with PromptArchitect)
+                        # Unified Title Logic
                         course_name = meta.get('course_name') or meta.get('course_id') or ""
                         base_title = meta.get('title') or meta.get('file_name') or meta.get('file_title') or "Institutional Document"
                         full_title = f"{base_title} [{course_name}]" if course_name else base_title
-                        
-                        # RESOLVE MATERIAL ID (for Analysis button stability)
-                        mat_id = meta.get("source_link") or meta.get("url") if (
-                            meta.get("source_link") and "drive.google.com" in (meta.get("source_link") or "")
-                        ) else (meta.get("id") or meta.get("source_id"))
+
+                        # RESOLVE MATERIAL ID: prefer Drive source_link, fallback to source_id/id
+                        sl = meta.get("source_link") or meta.get("url") or meta.get("webViewLink")
+                        if sl and "drive.google.com" in sl:
+                            mat_id = sl
+                        else:
+                            mat_id = meta.get("source_id") or meta.get("id")
+
 
                         if meta.get("type") == "announcement":
                             found_att = False
-                            ann_id = meta.get("id")
+                            ann_id = meta.get("source_id") or meta.get("id")
                             if ann_id:
-                                # 1. Check current context for child attachments (Fastest)
+                                # 1. Check current context for child attachments
                                 for other in c_data.get("course_context", []):
                                     om = other.get("metadata", {})
                                     if om.get("source_id") == ann_id or om.get("parent_announcement_id") == ann_id:
-                                        mat_id = om.get("source_link") or om.get("id")
+                                        child_sl = om.get("source_link") or om.get("url")
+                                        mat_id = child_sl if child_sl and "drive.google.com" in child_sl else om.get("source_id") or om.get("id")
+                                        sl = child_sl or sl
                                         found_att = True
                                         break
                                 
-                                # 2. Check DB for focused attachment materials (Authoritative)
                                 if not found_att:
                                     try:
                                         m_record = db.query(Material).filter(Material.id == ann_id).first()
                                         if m_record and m_record.attachments:
                                             try:
                                                 atts = json.loads(m_record.attachments)
-                                                if atts and len(atts) > 0:
+                                                if atts:
                                                     first_att = atts[0]
-                                                    # Prefer Drive URL over bare ID for reliable backend resolution
-                                                    mat_id = first_att.get("url") or first_att.get("id") or first_att.get("file_id")
+                                                    att_url = first_att.get("url") or first_att.get("alternateLink")
+                                                    mat_id = att_url or first_att.get("id") or first_att.get("file_id")
+                                                    sl = att_url or sl
                                                     found_att = True
                                             except: pass
-                                        
-                                        # 3. Fallback to broad DB search
                                         if not found_att:
                                             child_att = db.query(Material).filter(
                                                 (Material.id.like(f"%{ann_id}%")) | (Material.source_link.like(f"%{ann_id}%")),
@@ -352,21 +354,17 @@ async def chat_stream(
                                             ).first()
                                             if child_att:
                                                 mat_id = child_att.source_link or child_att.id
+                                                sl     = child_att.source_link or sl
                                     except: pass
-                        
-                        # Final override: always prefer Drive source_link as the material_id
-                        sl = meta.get("source_link") or meta.get("url") or meta.get("webViewLink")
-                        if sl and "drive.google.com" in sl:
-                            mat_id = sl
 
-                        # DEDUPLICATION LOGIC: Group by ID if available, otherwise title
+                        # DEDUPLICATION: Group by mat_id if available, otherwise by title
                         dedup_key = mat_id or full_title
                         if dedup_key not in sources_dict:
                             sources_dict[dedup_key] = {
-                                "title": full_title,
-                                "display": f"{prefix}{full_title}",
-                                "link": sl or meta.get("link"),
-                                "snippets": [item.get("content", "")],
+                                "title":       full_title,
+                                "display":     f"{prefix}{full_title}",
+                                "link":        sl,
+                                "snippets":    [item.get("content", "")],
                                 "source_type": meta.get("type", "document"),
                                 "material_id": mat_id
                             }
