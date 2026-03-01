@@ -150,23 +150,40 @@ Rules:
         def flatten_v3(res):
             if not res or not isinstance(res, dict): return []
             all_chunks = []
-            for doc in res.get('results', []):
-                doc_id   = doc.get('documentId')
-                doc_meta = doc.get('metadata', {})  # ← Our stored metadata (title, source_id, etc.)
-                for chunk in doc.get('chunks', []):
-                    chunk_meta = chunk.get('metadata', {})
-                    # CRITICAL: doc_meta takes PRIORITY over chunk_meta.
-                    # Chunk metadata is often generic and would overwrite our rich stored metadata.
-                    merged = {**chunk_meta, **doc_meta}
-                    # Always preserve these from the document level (never let chunks override)
-                    merged['documentId'] = doc_id
-                    if doc_meta.get('source_id'):
-                        merged['source_id'] = doc_meta['source_id']
-                    if doc_meta.get('title'):
-                        merged['title'] = doc_meta['title']
-                    if doc_meta.get('source_link'):
-                        merged['source_link'] = doc_meta['source_link']
-                    all_chunks.append({"content": chunk.get("content", ""), "metadata": merged})
+            
+            # Supermemory V3 can return results as a list of 'results' or 'docs'
+            results_list = res.get('results') or res.get('docs') or []
+            
+            for item in results_list:
+                # Grouped Format (V3 default grouped)
+                if 'chunks' in item and isinstance(item['chunks'], list):
+                    doc_id = item.get('documentId') or item.get('id')
+                    doc_meta = item.get('metadata', {})
+                    for chunk in item['chunks']:
+                        chunk_meta = chunk.get('metadata', {})
+                        # Merge: Document metadata (authoritative) + Chunk metadata (contextual)
+                        merged = {**chunk_meta, **doc_meta}
+                        merged['documentId'] = doc_id
+                        # Ensure presence of critical fields from the doc level
+                        for key in ['source_id', 'title', 'source_link', 'course_id', 'type']:
+                            if doc_meta.get(key):
+                                merged[key] = doc_meta[key]
+                        
+                        all_chunks.append({
+                            'content': chunk.get('content', '') or chunk.get('text', ''),
+                            'metadata': merged
+                        })
+                
+                # Flat Format (V3 default flat)
+                else:
+                    chunk_meta = item.get('metadata', {})
+                    chunk_meta['documentId'] = item.get('documentId') or item.get('id')
+                    all_chunks.append({
+                        'content': item.get('content') or item.get('text', ''),
+                        'metadata': chunk_meta
+                    })
+            
+            # logger is available via self.logger or import
             return all_chunks
 
         # Combine focused results into course_context

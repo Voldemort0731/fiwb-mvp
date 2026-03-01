@@ -176,8 +176,13 @@ async def chat_stream(
             # Classification and Retrieval (Async Parallel)
             short_term_history = []
             if history:
-                try: short_term_history = json.loads(history)
-                except: pass
+                if isinstance(history, str):
+                    try: short_term_history = json.loads(history)
+                    except: 
+                        logger.warning(f"[Chat] Failed to parse history string: {history[:100]}")
+                        short_term_history = []
+                elif isinstance(history, (list, tuple)):
+                    short_term_history = list(history)
 
             # 1. Classification first to decide if we need retrieval
             yield f"data: EVENT:THINKING:Classifying intent...\n\n"
