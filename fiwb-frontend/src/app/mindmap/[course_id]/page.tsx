@@ -375,10 +375,9 @@ function MindMapBody() {
                         handleGenerate([targetMatId], data);
                     }
                 }
-                // Default: Don't select anything, let user choose a document (NotebookCore per doc)
+                // Default: Select all materials
                 else {
-                    setSelectedSourceIds(new Set());
-                    setLoading(false);
+                    setSelectedSourceIds(new Set(data.map((s: SourceMaterial) => s.id)));
                 }
             })
             .catch(err => {

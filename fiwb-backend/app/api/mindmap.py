@@ -150,16 +150,16 @@ async def generate_mindmap(
     # Initialize Drive service for extracting content from attachments
     drive_service = DriveSyncService(user.access_token, user.email, user.refresh_token)
 
-    # Build content blocks — use massive context similar to NotebookCore
+    # Build content blocks — cap each at 3000 chars to stay within context
     content_blocks = []
     source_list = []
     total_chars = 0
-    MAX_CHARS = 200000 
+    MAX_CHARS = 40000
 
     async def process_material(m):
         material_text = f"[MATERIAL: {m.title}]\n"
         if m.content:
-            material_text += m.content # FULL CONTENT
+            material_text += m.content[:5000]
         else:
             material_text += "(No text content)"
 
@@ -180,14 +180,14 @@ async def generate_mindmap(
                         if isinstance(doc_content, str) and doc_content:
                             title = tasks[i][0]
                             material_text += f"\n--- [ATTACHMENT: {title}] ---\n"
-                            material_text += doc_content # FULL ATTACHMENT CONTENT
+                            material_text += doc_content[:5000]
             except Exception as e:
                 logger.warning(f"[MindMap] Failed to extract attachments for {m.id}: {e}")
         
         material_text += "\n---\n"
         return material_text
 
-    # Extract all material content in parallel
+    # Extract all material content in parallel (limited to first 10 materials to avoid blowing up)
     extraction_tasks = [process_material(m) for m in materials[:10]]
     content_blocks = await asyncio.gather(*extraction_tasks)
     
