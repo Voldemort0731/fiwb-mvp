@@ -86,6 +86,9 @@ async def generate_mindmap(
     material_ids = payload.get("material_ids", [])  # Optional: subset of materials
     thread_id = payload.get("thread_id")
 
+    num_materials = len(material_ids) if material_ids else 0
+    force_regen = payload.get("force", False)
+
     if not user_email or not course_id:
         raise HTTPException(status_code=400, detail="user_email and course_id are required")
 
@@ -119,7 +122,7 @@ async def generate_mindmap(
                 ChatThread.material_id == None
             ).first()
 
-    if existing_thread and existing_thread.mindmap_data:
+    if existing_thread and existing_thread.mindmap_data and not force_regen:
         try:
             cached_data = json.loads(existing_thread.mindmap_data)
             logger.info(f"[MindMap] Returning cached graph for thread: {existing_thread.id}")

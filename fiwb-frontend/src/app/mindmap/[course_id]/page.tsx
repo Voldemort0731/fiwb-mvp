@@ -274,7 +274,7 @@ function MindMapBody() {
     }, [setNodes, setEdges, fitView]);
 
     /* ── Generate mind map ── */
-    const handleGenerate = useCallback(async (customIds?: string[], customSources?: SourceMaterial[]) => {
+    const handleGenerate = useCallback(async (customIds?: string[], customSources?: SourceMaterial[], force = false) => {
         if (!course_id || !userEmail) return;
         setGenerating(true);
         setError(null);
@@ -289,6 +289,7 @@ function MindMapBody() {
                     user_email: userEmail,
                     course_id,
                     thread_id: searchParams.get("thread"),
+                    force,
                     material_ids: customIds || (selectedSourceIds.size > 0
                         ? Array.from(selectedSourceIds)
                         : undefined),
@@ -654,7 +655,7 @@ function MindMapBody() {
                         {/* Generate Button */}
                         <div className="p-5 space-y-3">
                             <button
-                                onClick={() => handleGenerate()}
+                                onClick={() => handleGenerate(undefined, undefined, !!graphData)}
                                 disabled={generating || selectedSourceIds.size === 0}
                                 className="w-full flex items-center justify-center gap-2 p-3 rounded-xl font-bold text-sm transition-all bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-500 hover:to-purple-500 shadow-lg shadow-indigo-500/20 cursor-pointer disabled:bg-white/5 disabled:text-gray-500 disabled:cursor-not-allowed"
                             >
