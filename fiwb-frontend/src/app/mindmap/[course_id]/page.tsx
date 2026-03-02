@@ -360,7 +360,6 @@ function MindMapBody() {
                 // Case B: Deep-linked from a specific material (Analysis page)
                 else if (targetMatId) {
                     const found = data.find((s: SourceMaterial) => s.id === targetMatId);
-                    setSelectedSourceIds(new Set([targetMatId]));
                     setActiveMaterialId(found?.file_id || targetMatId);
                     setShowReader(true);
 
