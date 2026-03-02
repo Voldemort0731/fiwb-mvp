@@ -410,14 +410,6 @@ export default function Dashboard() {
                                                     </div>
                                                 )}
                                             </div>
-                                            <button
-                                                onClick={(e) => { e.stopPropagation(); router.push(`/mindmap/${course.id}`); }}
-                                                className="opacity-0 group-hover:opacity-100 flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600/10 hover:bg-indigo-600/20 border border-indigo-500/20 rounded-lg text-[10px] font-black text-indigo-400 transition-all uppercase tracking-wider flex-shrink-0"
-                                                title="Generate Mind Map"
-                                            >
-                                                <Network size={12} />
-                                                Map
-                                            </button>
                                             <ChevronRight size={14} className="text-gray-300 group-hover:text-blue-500 transition-all translate-x-0 group-hover:translate-x-1 flex-shrink-0" />
                                         </div>
                                     ))
