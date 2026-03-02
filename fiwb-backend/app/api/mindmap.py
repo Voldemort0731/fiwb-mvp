@@ -86,9 +86,6 @@ async def generate_mindmap(
     material_ids = payload.get("material_ids", [])  # Optional: subset of materials
     thread_id = payload.get("thread_id")
 
-    num_materials = len(material_ids) if material_ids else 0
-    force_regen = payload.get("force", False)
-
     if not user_email or not course_id:
         raise HTTPException(status_code=400, detail="user_email and course_id are required")
 
@@ -122,7 +119,7 @@ async def generate_mindmap(
                 ChatThread.material_id == None
             ).first()
 
-    if existing_thread and existing_thread.mindmap_data and not force_regen:
+    if existing_thread and existing_thread.mindmap_data:
         try:
             cached_data = json.loads(existing_thread.mindmap_data)
             logger.info(f"[MindMap] Returning cached graph for thread: {existing_thread.id}")
@@ -231,32 +228,28 @@ async def generate_mindmap(
     # ── MAP SOURCES TO GOOGLE FILE IDs FOR FRONTEND READER ─────────
     # We want to map the material title back to the ACTUAL Google Drive file_id
     # so the frontend split-view reader can open it.
-    # Prefer PDF/Drive file IDs for better reading experience
     title_to_file_id = {}
     for m in materials:
-        fid = None
         if m.attachments and m.attachments != "[]":
             try:
                 atts = json.loads(m.attachments)
-                for att in atts:
-                    fid = att.get("file_id") or att.get("id")
+                if atts:
+                    # Prefer PDF/Drive file IDs
+                    primary = atts[0]
+                    fid = primary.get("file_id") or primary.get("id")
                     if fid:
-                        # If we find a PDF or drive file, we take it and break
-                        mime = str(att.get("mime_type") or "").lower()
-                        if "pdf" in mime or att.get("type") == "drive_file":
-                            break
+                        title_to_file_id[m.title] = fid
             except:
                 pass
-        
-        # Fallback to database ID if no file_id found, but store it by normalized title
-        title_to_file_id[m.title.strip().lower()] = fid or m.id
+        # Fallback to database ID if no attachment (though proxy won't work for text-only anyway)
+        if m.title not in title_to_file_id:
+            title_to_file_id[m.title] = m.id
 
     nodes = graph_data.get("nodes", [])
     for n in nodes:
         citations = n.get("citations", [])
         for c in citations:
-            source_title = str(c.get("source", "")).strip().lower()
-            c["material_id"] = title_to_file_id.get(source_title)
+            c["material_id"] = title_to_file_id.get(c["source"])
 
     final_result = {
         "title": graph_data.get("title", course.name),

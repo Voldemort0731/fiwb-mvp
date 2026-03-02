@@ -274,7 +274,7 @@ function MindMapBody() {
     }, [setNodes, setEdges, fitView]);
 
     /* ── Generate mind map ── */
-    const handleGenerate = useCallback(async (customIds?: string[], customSources?: SourceMaterial[], force = false) => {
+    const handleGenerate = useCallback(async (customIds?: string[], customSources?: SourceMaterial[]) => {
         if (!course_id || !userEmail) return;
         setGenerating(true);
         setError(null);
@@ -289,7 +289,6 @@ function MindMapBody() {
                     user_email: userEmail,
                     course_id,
                     thread_id: searchParams.get("thread"),
-                    force,
                     material_ids: customIds || (selectedSourceIds.size > 0
                         ? Array.from(selectedSourceIds)
                         : undefined),
@@ -404,24 +403,15 @@ function MindMapBody() {
         // Sync with reader: if node has citations, open the first one in the reader
         if (nd.citations && nd.citations.length > 0) {
             const firstCite = nd.citations[0];
-
-            // Try to find the file_id from material_id (backend provided) 
-            // OR look it up in availableSources by title
-            let fileId = firstCite.material_id;
-            if (!fileId || fileId === firstCite.source) {
-                const found = availableSources.find(s => s.title === firstCite.source);
-                if (found) fileId = found.file_id || found.id;
-            }
-
-            if (fileId) {
-                setActiveMaterialId(fileId);
+            if (firstCite.material_id) {
+                setActiveMaterialId(firstCite.material_id);
                 setActivePage(firstCite.page || null);
                 setShowReader(true);
             }
         }
 
         setCenter(node.position.x + 90, node.position.y + 40, { zoom: 1.2, duration: 500 });
-    }, [setCenter, availableSources]);
+    }, [setCenter]);
 
     /* ── Focus mode: dim other nodes ── */
     useEffect(() => {
@@ -589,9 +579,7 @@ function MindMapBody() {
                                         />
                                         {/* Reader Header Overlay */}
                                         <div className="absolute top-0 left-0 right-0 h-10 bg-black/80 backdrop-blur flex items-center justify-between px-4 border-b border-white/5">
-                                            <p className="text-[10px] text-gray-400 font-bold truncate">
-                                                Reference: {availableSources.find(s => (s.id === activeMaterialId || s.file_id === activeMaterialId))?.title || "Document"}
-                                            </p>
+                                            <p className="text-[10px] text-gray-400 font-bold truncate"> Reference: {availableSources.find(s => s.id === activeMaterialId)?.title}</p>
                                             <button
                                                 onClick={() => setShowReader(false)}
                                                 className="p-1 hover:bg-white/10 rounded"
@@ -655,7 +643,7 @@ function MindMapBody() {
                         {/* Generate Button */}
                         <div className="p-5 space-y-3">
                             <button
-                                onClick={() => handleGenerate(undefined, undefined, !!graphData)}
+                                onClick={() => handleGenerate()}
                                 disabled={generating || selectedSourceIds.size === 0}
                                 className="w-full flex items-center justify-center gap-2 p-3 rounded-xl font-bold text-sm transition-all bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-500 hover:to-purple-500 shadow-lg shadow-indigo-500/20 cursor-pointer disabled:bg-white/5 disabled:text-gray-500 disabled:cursor-not-allowed"
                             >
@@ -888,14 +876,8 @@ function MindMapBody() {
                                                 <button
                                                     key={i}
                                                     onClick={() => {
-                                                        let fileId = cite.material_id;
-                                                        if (!fileId || fileId === cite.source) {
-                                                            const found = availableSources.find(s => s.title === cite.source);
-                                                            if (found) fileId = found.file_id || found.id;
-                                                        }
-
-                                                        if (fileId) {
-                                                            setActiveMaterialId(fileId);
+                                                        if (cite.material_id) {
+                                                            setActiveMaterialId(cite.material_id);
                                                             setActivePage(cite.page || null);
                                                             setShowReader(true);
                                                         }
