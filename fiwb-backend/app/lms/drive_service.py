@@ -120,7 +120,7 @@ class DriveSyncService:
                     user_id=user_id,
                     course_id="GOOGLE_DRIVE",
                     title=file['name'],
-                    content=content[:5000], 
+                    content=content, 
                     type="drive_file",
                     created_at=file.get('createdTime'),
                     source_link=file.get('webViewLink'),
