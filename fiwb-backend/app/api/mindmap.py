@@ -142,7 +142,7 @@ async def generate_mindmap(
     if material_ids:
         query = query.filter(Material.id.in_(material_ids))
 
-    materials = query.order_by(Material.created_at.desc()).limit(20).all()
+    materials = query.order_by(Material.created_at.desc()).limit(50).all()
 
     if not materials:
         raise HTTPException(status_code=404, detail="No materials found for this course. Please sync your course first.")
@@ -150,16 +150,16 @@ async def generate_mindmap(
     # Initialize Drive service for extracting content from attachments
     drive_service = DriveSyncService(user.access_token, user.email, user.refresh_token)
 
-    # Build content blocks — cap each at 3000 chars to stay within context
+    # Build content blocks — significantly increased capacity to capture the ENTIRE document
     content_blocks = []
     source_list = []
     total_chars = 0
-    MAX_CHARS = 40000
+    MAX_CHARS = 1000000 # 1 Million chars (approx 250k tokens)
 
     async def process_material(m):
         material_text = f"[MATERIAL: {m.title}]\n"
         if m.content:
-            material_text += m.content[:5000]
+            material_text += m.content[:100000] # Capture up to ~60 pages of description/text
         else:
             material_text += "(No text content)"
 
@@ -180,7 +180,7 @@ async def generate_mindmap(
                         if isinstance(doc_content, str) and doc_content:
                             title = tasks[i][0]
                             material_text += f"\n--- [ATTACHMENT: {title}] ---\n"
-                            material_text += doc_content[:5000]
+                            material_text += doc_content[:200000] # Capture the entire content of most documents
             except Exception as e:
                 logger.warning(f"[MindMap] Failed to extract attachments for {m.id}: {e}")
         
