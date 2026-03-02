@@ -375,9 +375,10 @@ function MindMapBody() {
                         handleGenerate([targetMatId], data);
                     }
                 }
-                // Default: Select all materials
+                // Default: Don't select anything, let user choose a document (NotebookCore per doc)
                 else {
-                    setSelectedSourceIds(new Set(data.map((s: SourceMaterial) => s.id)));
+                    setSelectedSourceIds(new Set());
+                    setLoading(false);
                 }
             })
             .catch(err => {
@@ -732,7 +733,7 @@ function MindMapBody() {
                                     <div>
                                         <h2 className="text-2xl font-black text-white mb-2">AI Concept Graph</h2>
                                         <p className="text-sm text-gray-500 max-w-xs">
-                                            Select your course materials on the left, then click <span className="text-indigo-400 font-bold">Generate Mind Map</span> to extract and visualize all key concepts.
+                                            Select a document on the left, then click <span className="text-indigo-400 font-bold">Generate Mind Map</span> to extract and visualize its key concepts with full-context accuracy.
                                         </p>
                                     </div>
                                     <div className="grid grid-cols-3 gap-3 mt-2">
