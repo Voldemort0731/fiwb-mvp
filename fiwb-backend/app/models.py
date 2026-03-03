@@ -39,6 +39,7 @@ class User(Base):
     # Relationships
     courses = relationship("Course", secondary=user_courses, back_populates="users")
     threads = relationship("ChatThread", back_populates="user", cascade="all, delete-orphan")
+    groups = relationship("ThreadGroup", back_populates="user", cascade="all, delete-orphan")
     materials = relationship("Material", back_populates="user", cascade="all, delete-orphan")
 
 class Course(Base):
@@ -80,12 +81,28 @@ class ChatThread(Base):
     material_id = Column(String, nullable=True, index=True) # Links to source doc for analysis threads
     course_id = Column(String, ForeignKey("courses.id"), nullable=True, index=True) # For course-level context (e.g. mindmaps)
     thread_type = Column(String, default="chat", index=True) # chat, analysis, mindmap
+    group_id = Column(String, ForeignKey("thread_groups.id"), nullable=True, index=True)
     mindmap_data = Column(Text, nullable=True) # Cached JSON mindmap data
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     user = relationship("User", back_populates="threads")
     messages = relationship("ChatMessage", back_populates="thread", cascade="all, delete-orphan")
+    group = relationship("ThreadGroup", back_populates="threads")
+
+class ThreadGroup(Base):
+    __tablename__ = "thread_groups"
+
+    id = Column(String, primary_key=True, index=True)  # UUID
+    user_id = Column(Integer, ForeignKey("users.id"), index=True)
+    name = Column(String, nullable=False)
+    color = Column(String, default="#6366f1")   # Hex color
+    emoji = Column(String, default="📁")        # Emoji icon
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    user = relationship("User", back_populates="groups")
+    threads = relationship("ChatThread", back_populates="group")
 
 class ChatMessage(Base):
     __tablename__ = "chat_messages"

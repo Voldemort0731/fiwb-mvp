@@ -11,7 +11,7 @@ import logging
 from datetime import datetime
 
 from app.database import get_db, SessionLocal
-from app.models import User, ChatThread, ChatMessage, Material, Course
+from app.models import User, ChatThread, ChatMessage, Material, Course, ThreadGroup
 from app.intelligence.triage_agent import classify_query
 from app.intelligence.retrieval import RetrievalOrchestrator
 from app.intelligence.prompt_architect import PromptArchitect
@@ -58,7 +58,8 @@ async def list_threads(user_email: str, db: Session = Depends(get_db)):
         "updated_at": t.updated_at,
         "material_id": t.material_id,
         "course_id": t.course_id,
-        "thread_type": t.thread_type or "chat"
+        "thread_type": t.thread_type or "chat",
+        "group_id": t.group_id
     } for t in threads]
 
 @router.get("/threads/find")
@@ -128,25 +129,126 @@ async def delete_thread(thread_id: str, user_email: str, db: Session = Depends(g
     return {"status": "deleted"}
 
 @router.put("/threads/{thread_id}")
-async def rename_thread(thread_id: str, payload: dict, db: Session = Depends(get_db)):
+async def update_thread(thread_id: str, payload: dict, db: Session = Depends(get_db)):
+    """Update thread title and/or group assignment."""
     user_email = payload.get("user_email")
     new_title = payload.get("title")
-    if not user_email or not new_title:
-        raise HTTPException(status_code=400, detail="user_email and title are required")
-        
+    group_id = payload.get("group_id")  # None = remove from group, string = assign to group
+    has_group_update = "group_id" in payload  # Distinguish None-assignment from missing
+
+    if not user_email:
+        raise HTTPException(status_code=400, detail="user_email is required")
+    if not new_title and not has_group_update:
+        raise HTTPException(status_code=400, detail="title or group_id is required")
+
     actual_email = standardize_email(user_email)
     user = db.query(User).filter(User.email == actual_email).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-        
+
     thread = db.query(ChatThread).filter(ChatThread.id == thread_id, ChatThread.user_id == user.id).first()
     if not thread:
         raise HTTPException(status_code=403, detail="Not authorized or thread not found")
 
-    thread.title = new_title
+    if new_title:
+        thread.title = new_title
+    if has_group_update:
+        # Validate group belongs to user if not None
+        if group_id:
+            grp = db.query(ThreadGroup).filter(ThreadGroup.id == group_id, ThreadGroup.user_id == user.id).first()
+            if not grp:
+                raise HTTPException(status_code=404, detail="Group not found")
+        thread.group_id = group_id
+
     thread.updated_at = datetime.utcnow()
     db.commit()
-    return {"id": thread.id, "title": thread.title}
+    return {"id": thread.id, "title": thread.title, "group_id": thread.group_id}
+
+
+# ────────── GROUP ENDPOINTS ──────────
+
+@router.get("/groups")
+async def list_groups(user_email: str, db: Session = Depends(get_db)):
+    actual_email = standardize_email(user_email)
+    user = db.query(User).filter(User.email == actual_email).first()
+    if not user: return []
+    groups = db.query(ThreadGroup).filter(ThreadGroup.user_id == user.id).order_by(ThreadGroup.created_at.asc()).all()
+    return [{
+        "id": g.id,
+        "name": g.name,
+        "color": g.color,
+        "emoji": g.emoji,
+        "created_at": g.created_at,
+    } for g in groups]
+
+
+@router.post("/groups")
+async def create_group(payload: dict, db: Session = Depends(get_db)):
+    user_email = payload.get("user_email")
+    name = payload.get("name", "New Group")
+    color = payload.get("color", "#6366f1")
+    emoji = payload.get("emoji", "📁")
+
+    if not user_email:
+        raise HTTPException(status_code=400, detail="user_email is required")
+
+    actual_email = standardize_email(user_email)
+    user = db.query(User).filter(User.email == actual_email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    group = ThreadGroup(
+        id=str(uuid.uuid4()),
+        user_id=user.id,
+        name=name,
+        color=color,
+        emoji=emoji
+    )
+    db.add(group)
+    db.commit()
+    db.refresh(group)
+    return {"id": group.id, "name": group.name, "color": group.color, "emoji": group.emoji}
+
+
+@router.put("/groups/{group_id}")
+async def update_group(group_id: str, payload: dict, db: Session = Depends(get_db)):
+    user_email = payload.get("user_email")
+    if not user_email:
+        raise HTTPException(status_code=400, detail="user_email is required")
+
+    actual_email = standardize_email(user_email)
+    user = db.query(User).filter(User.email == actual_email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    group = db.query(ThreadGroup).filter(ThreadGroup.id == group_id, ThreadGroup.user_id == user.id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    if "name" in payload: group.name = payload["name"]
+    if "color" in payload: group.color = payload["color"]
+    if "emoji" in payload: group.emoji = payload["emoji"]
+    group.updated_at = datetime.utcnow()
+    db.commit()
+    return {"id": group.id, "name": group.name, "color": group.color, "emoji": group.emoji}
+
+
+@router.delete("/groups/{group_id}")
+async def delete_group(group_id: str, user_email: str, db: Session = Depends(get_db)):
+    actual_email = standardize_email(user_email)
+    user = db.query(User).filter(User.email == actual_email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    group = db.query(ThreadGroup).filter(ThreadGroup.id == group_id, ThreadGroup.user_id == user.id).first()
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    # Unassign threads from this group (don't delete them)
+    db.query(ChatThread).filter(ChatThread.group_id == group_id).update({"group_id": None})
+    db.delete(group)
+    db.commit()
+    return {"status": "deleted"}
 
 @router.post("/stream")
 async def chat_stream(
