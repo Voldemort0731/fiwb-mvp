@@ -271,12 +271,30 @@ function AnalysisBody() {
     const scrollRef = useRef<HTMLDivElement>(null);
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const [userToken, setUserToken] = useState<string | null>(null);
     const hasInitialized = useRef(false);
 
     // Sidebar thread state
     const [threads, setThreads] = useState<any[]>([]);
 
     const userEmail = typeof window !== 'undefined' ? localStorage.getItem("user_email") : null;
+
+    // Fetch Google token for Drive preview authentication
+    useEffect(() => {
+        if (!userEmail) return;
+        const fetchToken = async () => {
+            try {
+                const res = await fetch(`${API_URL}/api/auth/token?user_email=${userEmail}`);
+                const data = await res.json();
+                if (data.access_token) {
+                    setUserToken(data.access_token);
+                }
+            } catch (e) {
+                console.error("Failed to fetch Google token:", e);
+            }
+        };
+        fetchToken();
+    }, [userEmail]);
 
     // Auto-scroll to bottom
     useEffect(() => {
@@ -397,23 +415,27 @@ function AnalysisBody() {
         const isDrive = activeAttachment.url?.includes('drive.google.com');
 
         if (isDrive) {
-            // Use the proxy URL as base
-            targetUrl = `${API_URL}/api/courses/proxy/drive/${activeAttachment.id}?user_email=${userEmail}`;
+            // Use native preview with access_token
+            const fileId = activeAttachment.id;
+            targetUrl = `https://drive.google.com/file/d/${fileId}/preview`;
+            if (userToken) {
+                targetUrl += `?access_token=${userToken}`;
+            }
         } else {
-            // Direct preview URL
+            // Direct preview URL for other types (e.g. Moodle)
             targetUrl = activeAttachment.url?.replace('/view', '/preview') || "";
         }
 
         // Append page as fragment (Standard for PDF viewers to jump without reload)
-        const finalUrl = `${targetUrl}#page=${pageNum}`;
+        const finalUrl = `${targetUrl}${targetUrl.includes('?') ? '&' : '?'}#page=${pageNum}`;
 
         // Force update if it's the same base URL to ensure fragment jump
         if (iframeRef.current.src.split('#')[0] === finalUrl.split('#')[0]) {
-            iframeRef.current.src = `${targetUrl}&_t=${Date.now()}#page=${pageNum}`;
+            iframeRef.current.src = `${targetUrl}${targetUrl.includes('?') ? '&' : '?'}#page=${pageNum}&_t=${Date.now()}`;
         } else {
             iframeRef.current.src = finalUrl;
         }
-    }, [activeAttachment, userEmail]);
+    }, [activeAttachment, userEmail, userToken]);
 
     // Main send message function
     // `isInitialAnalysis` is true only for the first auto-triggered call - it passes the raw doc content.
@@ -727,7 +749,7 @@ function AnalysisBody() {
                                     ref={iframeRef}
                                     src={
                                         activeAttachment.url?.includes('drive.google.com')
-                                            ? `${API_URL}/api/courses/proxy/drive/${activeAttachment.id}?user_email=${userEmail}`
+                                            ? `https://drive.google.com/file/d/${activeAttachment.id}/preview${userToken ? `?access_token=${userToken}` : ''}`
                                             : activeAttachment.url?.replace('/view', '/preview')
                                     }
                                     className="w-full h-full border-none"

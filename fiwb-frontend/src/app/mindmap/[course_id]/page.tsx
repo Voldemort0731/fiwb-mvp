@@ -213,8 +213,27 @@ function MindMapBody() {
     const [activeMaterialId, setActiveMaterialId] = useState<string | null>(null);
     const [activePage, setActivePage] = useState<number | null>(null);
     const [showReader, setShowReader] = useState(false);
+    const [userToken, setUserToken] = useState<string | null>(null);
 
     const userEmail = typeof window !== "undefined" ? localStorage.getItem("user_email") : null;
+    
+    // Fetch Google token for Drive preview authentication
+    useEffect(() => {
+        if (!userEmail) return;
+        const fetchToken = async () => {
+            try {
+                const res = await fetch(`${API_URL}/api/auth/token?user_email=${userEmail}`);
+                const data = await res.json();
+                if (data.access_token) {
+                    setUserToken(data.access_token);
+                }
+            } catch (e) {
+                console.error("Failed to fetch Google token:", e);
+            }
+        };
+        fetchToken();
+    }, [userEmail]);
+
     const { fitView, setCenter } = useReactFlow();
     const iframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -573,7 +592,11 @@ function MindMapBody() {
                                         <iframe
                                             key={`${activeMaterialId}-${activePage}`}
                                             ref={iframeRef}
-                                            src={`${API_URL}/api/courses/proxy/drive/${activeMaterialId}?user_email=${userEmail}${activePage ? `#page=${activePage}` : ""}`}
+                                            src={
+                                                activeMaterialId?.length && activeMaterialId.length > 20 // Crude check if it's a Google ID
+                                                    ? `https://drive.google.com/file/d/${activeMaterialId}/preview${userToken ? `?access_token=${userToken}` : ''}${activePage ? `#page=${activePage}` : ""}`
+                                                    : `${API_URL}/api/courses/proxy/drive/${activeMaterialId}?user_email=${userEmail}${activePage ? `#page=${activePage}` : ""}`
+                                            }
                                             className="w-full h-full border-none bg-white"
                                             title="Document Reader"
                                         />

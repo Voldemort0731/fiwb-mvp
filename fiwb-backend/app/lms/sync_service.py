@@ -483,7 +483,8 @@ class LMSSyncService:
                             meta = await asyncio.to_thread(
                                 lambda: service.files().get(
                                     fileId=file_id,
-                                    fields='id,name,mimeType,webViewLink'
+                                    fields='id,name,mimeType,webViewLink',
+                                    supportsAllDrives=True
                                 ).execute()
                             )
                         mime = meta.get('mimeType', '')

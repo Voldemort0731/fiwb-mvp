@@ -56,7 +56,9 @@ class DriveSyncService:
                 lambda: service.files().list(
                     q="mimeType = 'application/vnd.google-apps.folder' and 'root' in parents and trashed = false",
                     fields="files(id, name, webViewLink)",
-                    pageSize=50
+                    pageSize=50,
+                    supportsAllDrives=True,
+                    includeItemsFromAllDrives=True
                 ).execute()
             )
         UsageTracker.log_lms_request(self.user_email)
@@ -88,7 +90,11 @@ class DriveSyncService:
             try:
                 async with GLOBAL_API_LOCK:
                     item = await asyncio.to_thread(
-                        lambda: service.files().get(fileId=item_id, fields="id, name, mimeType, webViewLink, createdTime").execute()
+                        lambda: service.files().get(
+                            fileId=item_id, 
+                            fields="id, name, mimeType, webViewLink, createdTime",
+                            supportsAllDrives=True
+                        ).execute()
                     )
                 
                 if item['mimeType'] == 'application/vnd.google-apps.folder':
@@ -174,7 +180,7 @@ class DriveSyncService:
         files = await self._get_all_files_recursive(folder_id, mime_types)
         synced_count = 0
 
-        batch_size = 2
+        batch_size = 5
         for i in range(0, len(files), batch_size):
             batch = files[i:i + batch_size]
             for file in batch:
@@ -194,7 +200,7 @@ class DriveSyncService:
                 target_mime = 'text/plain' if 'document' in mime_type or 'presentation' in mime_type else 'text/csv'
                 request = service.files().export_media(fileId=file_id, mimeType=target_mime)
             else:
-                request = service.files().get_media(fileId=file_id)
+                request = service.files().get_media(fileId=file_id, supportsAllDrives=True)
 
             try:
                 fh = io.BytesIO()
@@ -213,7 +219,9 @@ class DriveSyncService:
                     return "\n\n".join(pages)
                 
                 return fh.getvalue().decode('utf-8', errors='ignore')
-            except:
+            except Exception as e:
+                import logging
+                logging.getLogger("uvicorn.error").error(f"Failed to extract Drive content for {file_id}: {e}")
                 return ""
     
     async def _get_all_files_recursive(self, folder_id: str, mime_types: list) -> list:
@@ -233,7 +241,13 @@ class DriveSyncService:
             while True:
                 async with GLOBAL_API_LOCK:
                     results = await asyncio.to_thread(
-                        lambda: service.files().list(q=query, fields="nextPageToken, files(id, name, mimeType, webViewLink, createdTime)", pageToken=page_token).execute()
+                        lambda: service.files().list(
+                            q=query, 
+                            fields="nextPageToken, files(id, name, mimeType, webViewLink, createdTime)", 
+                            pageToken=page_token,
+                            supportsAllDrives=True,
+                            includeItemsFromAllDrives=True
+                        ).execute()
                     )
                 items = results.get('files', [])
                 for item in items:
