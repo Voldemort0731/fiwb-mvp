@@ -2,6 +2,15 @@
 
 This file tracks stable, verified versions of the codebase. Use these checkpoints to revert changes if new updates break functionality.
 
+## 🔵 Stable Version v1.2 (Picker & Trust Fixed)
+- **Status**: Stable
+- **Date**: 2026-03-14
+- **Key Fixes Included**:
+  - **Picker UX**: Configured `AppId` and `Origin` for the Google Picker API to eliminate redundant sign-in prompts within the app.
+  - **Platform Trust**: Added `GOOGLE_API_KEY` (Developer Key) to both frontend and backend to establish full trust with Google API services.
+  - **Environment Integrity**: Verified backend `.env` configuration and centralized API keys for production reliability.
+  - **Drive Global Access**: Confirmed `supportsAllDrives=True` enforcement across all retrieval and sync methods.
+
 ## 🔵 Stable Version v1.1 (Drive & Sync Fixed)
 - **Status**: Stable
 - **Date**: 2026-03-14
