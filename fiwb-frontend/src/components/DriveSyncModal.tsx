@@ -61,10 +61,15 @@ export default function DriveSyncModal({ isOpen, onClose }: DriveSyncModalProps)
                 .setIncludeFolders(true)
                 .setSelectFolderEnabled(true);
 
+            const CLIENT_ID = "46647341779-d5dtuag91cnfdnj44q6p8qq62toi8sod.apps.googleusercontent.com";
+            const APP_ID = CLIENT_ID.split("-")[0];
+
             const picker = new g.google.picker.PickerBuilder()
                 .addView(docsView)
                 .setOAuthToken(accessToken)
-                .setDeveloperKey("") // Optional: User should add API Key for better limits
+                .setDeveloperKey("AIzaSyC4Go7MXgw1FOJGleOh9qRewiMTqWyH4Hc") // IMPORTANT: Add your Google API Key here to remove the Sign-in prompt
+                .setAppId(APP_ID)
+                .setOrigin(window.location.origin)
                 .setCallback(async (data: any) => {
                     if (data.action === (g.google.picker as any).Action.PICKED) {
                         const docs = data.docs;
