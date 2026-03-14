@@ -65,7 +65,7 @@ export default function DriveSyncModal({ isOpen, onClose }: DriveSyncModalProps)
             const docsView = new g.google.picker.DocsView(g.google.picker.ViewId.FOLDERS)
                 .setIncludeFolders(true)
                 .setSelectFolderEnabled(true)
-                .setMimeTypes('application/vnd.google-apps.folder');
+                .setEnableDrives(true); // Crucial for Shared Drives visibility
 
             const CLIENT_ID = GOOGLE_CLIENT_ID;
             const APP_ID = CLIENT_ID.split("-")[0];
@@ -81,6 +81,7 @@ export default function DriveSyncModal({ isOpen, onClose }: DriveSyncModalProps)
                 .setCallback(async (data: any) => {
                     if (data.action === (g.google.picker as any).Action.PICKED) {
                         const docs = data.docs;
+                        if (!docs || docs.length === 0) return;
                         const ids = docs.map((d: any) => d.id);
                         await handleSyncManual(ids);
                     }
@@ -89,7 +90,7 @@ export default function DriveSyncModal({ isOpen, onClose }: DriveSyncModalProps)
             picker.setVisible(true);
         } catch (e) {
             console.error("Picker failed", e);
-            alert("Failed to open Google Picker. Please try again.");
+            alert("Failed to initialize Google Picker. Check if third-party cookies are blocked.");
         } finally {
             setSyncing(false);
         }
@@ -101,7 +102,7 @@ export default function DriveSyncModal({ isOpen, onClose }: DriveSyncModalProps)
 
         setSyncing(true);
         try {
-            await fetch(`${API_URL}/api/drive/sync`, {
+            const res = await fetch(`${API_URL}/api/drive/sync`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -110,11 +111,20 @@ export default function DriveSyncModal({ isOpen, onClose }: DriveSyncModalProps)
                 })
             });
 
+            if (!res.ok) throw new Error("Sync request failed");
+
             await fetchSyncedFolders();
-            setActiveTab("manage");
+            alert(`Successfully started syncing ${ids.length} folder(s)! It will take a few moments to import documents.`);
+            
+            // Dispatch event to refresh dashboard
             window.dispatchEvent(new Event('drive-sync-refresh'));
+            
+            // Switch to manage tab and close modal
+            setActiveTab("manage");
+            onClose(); 
         } catch (e) {
             console.error("Sync failed", e);
+            alert("Folder sync failed. Please try again.");
         } finally {
             setSyncing(false);
         }
