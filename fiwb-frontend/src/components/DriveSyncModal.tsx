@@ -57,9 +57,15 @@ export default function DriveSyncModal({ isOpen, onClose }: DriveSyncModalProps)
             await loadGapi();
             const g = window as any;
 
-            const docsView = new g.google.picker.DocsView()
+            // Important: Some browsers need the token to be set explicitly in gapi too
+            if (g.gapi && g.gapi.auth) {
+                g.gapi.auth.setToken({ access_token: accessToken });
+            }
+
+            const docsView = new g.google.picker.DocsView(g.google.picker.ViewId.FOLDERS)
                 .setIncludeFolders(true)
-                .setSelectFolderEnabled(true);
+                .setSelectFolderEnabled(true)
+                .setMimeTypes('application/vnd.google-apps.folder');
 
             const CLIENT_ID = GOOGLE_CLIENT_ID;
             const APP_ID = CLIENT_ID.split("-")[0];
@@ -69,7 +75,9 @@ export default function DriveSyncModal({ isOpen, onClose }: DriveSyncModalProps)
                 .setOAuthToken(accessToken)
                 .setDeveloperKey(GOOGLE_API_KEY) 
                 .setAppId(APP_ID)
-                .setOrigin(window.location.origin)
+                .setOrigin(window.location.protocol + "//" + window.location.host)
+                .enableFeature(g.google.picker.Feature.SUPPORT_DRIVES)
+                .enableFeature(g.google.picker.Feature.SUPPORT_TEAM_DRIVES)
                 .setCallback(async (data: any) => {
                     if (data.action === (g.google.picker as any).Action.PICKED) {
                         const docs = data.docs;
