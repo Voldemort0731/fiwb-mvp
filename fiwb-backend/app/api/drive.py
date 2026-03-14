@@ -164,7 +164,9 @@ async def unsync_drive(request: DriveUnsyncRequest, db: Session = Depends(get_db
                             lambda fid=folder_id: drive_svc.files().list(
                                 q=f"'{fid}' in parents and trashed = false",
                                 fields="files(id)",
-                                pageSize=500
+                                pageSize=500,
+                                supportsAllDrives=True,
+                                includeItemsFromAllDrives=True
                             ).execute()
                         )
                     
