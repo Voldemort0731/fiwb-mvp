@@ -2,7 +2,17 @@
 
 This file tracks stable, verified versions of the codebase. Use these checkpoints to revert changes if new updates break functionality.
 
-## 🟢 Stable Version v1.0 (Current Baseline)
+## 🔵 Stable Version v1.1 (Drive & Sync Fixed)
+- **Status**: Stable
+- **Date**: 2026-03-14
+- **Git Commit Hash**: `7a59d33e23472a85cd922a2b810103e5d7ef85e3`
+- **Key Fixes Included**:
+  - **Drive Preview Native**: Switched to native Google Drive `/preview` URLs with automatic token-based pre-authentication. Resolves 404/File Not Found errors in Classroom attachments.
+  - **Shared Drive Sync**: Enabled `supportsAllDrives=True` in the backend sync service. Resolves missing/unindexed Drive files owned by other users or in Google Classroom folders.
+  - **Auth Token Proxy**: Frontend now automatically fetches fresh Google access tokens to pre-authenticate Drive iframes.
+  - **Sync Robustness**: Fixed `NameError` crashes in `sync_service.py` and improved error logging for file content extraction.
+
+## 🟢 Stable Version v1.0 (Initial Baseline)
 - **Status**: Stable
 - **Date**: 2026-02-19
 - **Git Commit Hash**: `5c6463353104004d42b108b7d90d477defff9d0e6`
