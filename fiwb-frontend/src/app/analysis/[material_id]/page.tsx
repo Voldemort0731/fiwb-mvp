@@ -749,7 +749,7 @@ function AnalysisBody() {
                                     ref={iframeRef}
                                     src={
                                         activeAttachment.url?.includes('drive.google.com')
-                                            ? `https://drive.google.com/file/d/${activeAttachment.id}/preview${userToken ? `?access_token=${userToken}` : ''}`
+                                            ? `${API_URL}/api/courses/proxy/drive/${activeAttachment.id}?user_email=${userEmail}`
                                             : activeAttachment.url?.replace('/view', '/preview')
                                     }
                                     className="w-full h-full border-none"

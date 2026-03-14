@@ -593,8 +593,8 @@ function MindMapBody() {
                                             key={`${activeMaterialId}-${activePage}`}
                                             ref={iframeRef}
                                             src={
-                                                activeMaterialId?.length && activeMaterialId.length > 20 // Crude check if it's a Google ID
-                                                    ? `https://drive.google.com/file/d/${activeMaterialId}/preview${userToken ? `?access_token=${userToken}` : ''}${activePage ? `#page=${activePage}` : ""}`
+                                                activeMaterialId?.length && activeMaterialId.length > 20 || activeMaterialId?.includes('_')
+                                                    ? `${API_URL}/api/courses/proxy/drive/${activeMaterialId}?user_email=${userEmail}${activePage ? `#page=${activePage}` : ""}`
                                                     : `${API_URL}/api/courses/proxy/drive/${activeMaterialId}?user_email=${userEmail}${activePage ? `#page=${activePage}` : ""}`
                                             }
                                             className="w-full h-full border-none bg-white"

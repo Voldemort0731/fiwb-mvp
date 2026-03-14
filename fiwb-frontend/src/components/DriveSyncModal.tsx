@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Folder, X, Check, Loader2, Cloud, Search, ChevronRight, Trash2, FolderSync, FolderMinus, FileText, Sparkles } from "lucide-react";
-import { API_URL } from "@/utils/config";
+import { API_URL, GOOGLE_CLIENT_ID, GOOGLE_API_KEY } from "@/utils/config";
 import clsx from "clsx";
 
 interface DriveSyncModalProps {
@@ -61,13 +61,13 @@ export default function DriveSyncModal({ isOpen, onClose }: DriveSyncModalProps)
                 .setIncludeFolders(true)
                 .setSelectFolderEnabled(true);
 
-            const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "46647341779-d5dtuag91cnfdnj44q6p8qq62toi8sod.apps.googleusercontent.com";
+            const CLIENT_ID = GOOGLE_CLIENT_ID;
             const APP_ID = CLIENT_ID.split("-")[0];
 
             const picker = new g.google.picker.PickerBuilder()
                 .addView(docsView)
                 .setOAuthToken(accessToken)
-                .setDeveloperKey(process.env.NEXT_PUBLIC_GOOGLE_API_KEY || "") 
+                .setDeveloperKey(GOOGLE_API_KEY) 
                 .setAppId(APP_ID)
                 .setOrigin(window.location.origin)
                 .setCallback(async (data: any) => {
