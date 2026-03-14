@@ -456,7 +456,7 @@ class LMSSyncService:
             r')([a-zA-Z0-9_-]+)',
             re.IGNORECASE
         )
-        for m in drive_url_re.finditer(ann_text):
+        for m in drive_url_re.finditer(parent_text or ''):
             full_url = m.group(0)
             fid, mime = self._extract_drive_file_id_and_mime(full_url)
             if fid and fid not in files_to_process:
@@ -517,12 +517,12 @@ class LMSSyncService:
                     "course_name":            course_name,
                     "professor":              professor,
                     "type":                   "announcement_drive_attachment",
-                    "source_id":              f"ann_{ann_id}_drive_{file_id}",
+                    "source_id":              f"ann_{parent_id}_drive_{file_id}",
                     "source":                 "google_classroom",
                     "source_link":            file_link,
                     "file_title":             file_title,
                     "mime_type":              mime,
-                    "parent_announcement_id": ann_id,
+                    "parent_announcement_id": parent_id,
                 }
 
                 # --- Step 2: Persist to Local Database ---
